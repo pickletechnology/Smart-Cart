@@ -1,0 +1,25 @@
+# Arduino / PlatformIO build output
+build/
+.pio/
+.pioenvs/
+*.hex
+*.bin
+*.elf
+
+# Slicer output
+*.gcode
+*.3mf
+
+# CAD backups
+*.f3d.bak
+*.bak?
+
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
