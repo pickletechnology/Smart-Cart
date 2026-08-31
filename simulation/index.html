@@ -1055,14 +1055,31 @@ function buildCsv() {
   }
   return out;
 }
-$('btn-csv').addEventListener('click', () => {
-  const blob = new Blob([buildCsv()], {type: 'text/csv'});
+$('btn-csv').addEventListener('click', async () => {
+  const csv = buildCsv();
+  /* Published-artifact viewers save through the downloads capability;
+     a plain browser (this file opened locally) uses a blob link. */
+  if (window.claude && window.claude.use) {
+    try {
+      const dl = await window.claude.use('downloads');
+      if (dl) {
+        await dl.save({filename: 'smart-cart-run.csv', data: csv});
+        flash('CSV saved');
+        return;
+      }
+    } catch (err) {
+      if (err && err.code === 'declined') return;
+      flash('Save unavailable — use Copy CSV');
+      return;
+    }
+  }
+  const blob = new Blob([csv], {type: 'text/csv'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'smart-cart-run.csv';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  flash('CSV download started — if blocked here, use Copy CSV');
+  flash('CSV download started');
 });
 $('btn-copy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(buildCsv()); flash('CSV copied to clipboard'); }
