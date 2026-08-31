@@ -13,6 +13,12 @@ Three.js and all 3D assets are embedded/vendored. Keyboard: ◀ ▶ thrust,
 
 ## What's in the game
 
+- **A walkable campus hub**: you play a lab tech on foot (WASD / drag to
+  walk, Shift to run, E to interact) exploring a large open campus with
+  Newt trundling along behind you. Four world portals, NPCs with physics
+  gossip, Millie Volt's shop as a real building, and one-time collectible
+  coins are scattered across the map. Menus (Missions/Shop buttons) remain
+  as fast travel.
 - **4 worlds × 5 missions** (20 total), each world tied to a physics topic:
   *Vector Valley* (kinematics), *Grindstone Gulch* (friction & inclines),
   *The Conservatory* (energy), *The Colliseum* (momentum) — each ending in a
@@ -28,7 +34,10 @@ Three.js and all 3D assets are embedded/vendored. Keyboard: ◀ ▶ thrust,
   projectiles. Bosses take multiple hits and enrage.
 - **Question gates**: 48 multiple-choice physics questions (12 per topic,
   each bank independently re-derived and corrected by a verifier pass)
-  block checkpoints; correct answers pay points, XP, and battery.
+  block checkpoints; correct answers pay points, XP, and battery — and
+  stack an **Overvolt streak** (+1 N thrust per first-try answer, up to
+  +3 N, lost on a wrong answer). A **LETHAL glow** on the KE readout shows
+  when your kinetic energy currently beats a nearby enemy's threshold.
 - **Points, stars, and par scores** per mission; battery and time convert
   to bonus points at the finish.
 - **Leveling**: XP from missions and questions; levels + beaten bosses
