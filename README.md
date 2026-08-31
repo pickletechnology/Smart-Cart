@@ -25,6 +25,9 @@ Smart-Cart/
 ├── simulation/
 │   ├── README.md                       Physics model and lab exercises
 │   └── index.html                      Smart Cart Lab — browser simulation
+├── game/
+│   ├── README.md                       Game guide, assets, content pipeline
+│   └── index.html                      Cart Blanche — physics adventure game
 └── docs/
     ├── WIRING.md                       Pinout and sensor connections
     ├── CALIBRATION.md                  Every tunable constant, and how to set it
@@ -41,6 +44,14 @@ friction) with live velocity/acceleration/force graphs, and the simulated
 cart streams the same 20 Hz JSON lines as the real firmware, so a BLE client
 can be developed against it before touching hardware. See
 [`simulation/README.md`](simulation/README.md) for the physics model.
+
+## Game
+
+[`game/index.html`](game/index.html) is **Cart Blanche**, a physics adventure
+game where the Smart Cart fights the Stationary Front across four worlds of
+missions, kinetic-energy combat, and question gates — with XP levels, a shop,
+and everything running on the same honest F = ma physics. Open it in any
+browser; see [`game/README.md`](game/README.md).
 
 ## Hardware
 
