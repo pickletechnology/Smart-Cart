@@ -229,6 +229,10 @@
       <div class="rail-sec">
         <h2>Track</h2>
         <div class="ctl">
+          <div class="lab"><span>Track length</span><span class="val" id="v-len"></span></div>
+          <input type="range" id="s-len" min="0.60" max="2.00" step="0.05" value="1.00">
+        </div>
+        <div class="ctl">
           <div class="lab"><span>Incline angle</span><span class="val" id="v-angle"></span></div>
           <input type="range" id="s-angle" min="0" max="20" step="0.5" value="0">
         </div>
@@ -345,13 +349,12 @@
 const G = 9.81;
 
 /* ── Cart / track geometry (metres) — matches the V1 build ── */
-const TRACK_LEN     = 1.00;   // usable track length
 const WHEEL_DIA     = 0.034;  // the printed V1 wheel measures 34 mm
 const WHEEL_R       = WHEEL_DIA / 2;
 const WHEEL_CIRC    = Math.PI * WHEEL_DIA;
 const CART_HALF     = 0.065;  // half length of cart incl. hook
 const BUMP_X        = 0.085;  // hook touches bumper when x reaches this
-const FAR_X         = TRACK_LEN - 0.04;
+const farX          = () => P.trackLen - 0.04;   // far end-stop contact point
 const HANG0         = 0.15;   // initial dangle of the mass below the pulley
 const PULLEY_Y      = 0.857;  // world height of pulley axle (0.782 track + 0.075 bracket)
 const MASS_HALF_H   = 0.026;
@@ -368,7 +371,7 @@ const DT            = 1 / PHYS_HZ;
 
 /* ── Parameters (bound to sliders) ── */
 const P = {
-  angleDeg: 0, startX: 0.85, mu: 0.01, elast: 0.85,
+  trackLen: 1.00, angleDeg: 0, startX: 0.85, mu: 0.01, elast: 0.85,
   mCart: 0.25, mHang: 0.05, fan: 0, v0: 0, noise: true,
 };
 
@@ -427,8 +430,8 @@ function physStep() {
     const comp = BUMP_X - S.x;
     S.bumperF = Math.max(0, BUMP_K * comp - c * S.v);
     Fb += S.bumperF;
-  } else if (S.x > FAR_X) {                         // far end-stop
-    const comp = S.x - FAR_X;
+  } else if (S.x > farX()) {                        // far end-stop
+    const comp = S.x - farX();
     Fb -= Math.max(0, BUMP_K * comp + c * S.v);
   }
 
@@ -492,11 +495,11 @@ function physStep() {
   }
 
   /* Hard clamp at extreme ends (springs normally prevent reaching these) */
-  if (S.x < 0.02)            { S.x = 0.02; S.v = Math.max(0, S.v); }
-  if (S.x > TRACK_LEN - 0.02){ S.x = TRACK_LEN - 0.02; S.v = Math.min(0, S.v); }
+  if (S.x < 0.02)              { S.x = 0.02; S.v = Math.max(0, S.v); }
+  if (S.x > P.trackLen - 0.02) { S.x = P.trackLen - 0.02; S.v = Math.min(0, S.v); }
 
   /* Impact vibration for the IMU: excite on bumper contact */
-  if (S.bumperF > 0.5 || (S.x > FAR_X && Math.abs(S.v) > 0.05)) {
+  if (S.bumperF > 0.5 || (S.x > farX() && Math.abs(S.v) > 0.05)) {
     S.vib = Math.min(2.0, S.vib + Math.abs(S.v) * 0.12);
   }
   S.vib *= Math.exp(-DT * 18);
@@ -672,8 +675,8 @@ const key = new THREE.DirectionalLight(0xfff1de, 1.05);
 key.position.set(2.6, 3.6, 1.9);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
-key.shadow.camera.left = -2; key.shadow.camera.right = 2;
-key.shadow.camera.top = 2;   key.shadow.camera.bottom = -2;
+key.shadow.camera.left = -3; key.shadow.camera.right = 3;
+key.shadow.camera.top = 3;   key.shadow.camera.bottom = -3;
 key.shadow.camera.near = 1;  key.shadow.camera.far = 10;
 key.shadow.bias = -0.0004;
 scene.add(key);
@@ -691,21 +694,24 @@ const grid = new THREE.GridHelper(14, 28, 0x333c45, 0x272e36);
 grid.position.y = 0.001;
 scene.add(grid);
 
-/* ── Lab table ── */
+/* ── Lab table (sized to the track by layoutApparatus) ── */
 const table = new THREE.Group();
+let tableTop;
+const farLegs = [];
 {
   const topMat = new THREE.MeshStandardMaterial({color: 0x39424c, roughness: 0.72, metalness: 0.08});
   const legMat = new THREE.MeshStandardMaterial({color: 0x2b323a, roughness: 0.8, metalness: 0.25});
-  const top = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.045, 0.78), topMat);
-  top.position.set(0.72, 0.75 - 0.0225, 0);
-  top.castShadow = top.receiveShadow = true;
-  table.add(top);
+  tableTop = new THREE.Mesh(new THREE.BoxGeometry(1, 0.045, 0.78), topMat);
+  tableTop.position.y = 0.75 - 0.0225;
+  tableTop.castShadow = tableTop.receiveShadow = true;
+  table.add(tableTop);
   const legGeo = new THREE.BoxGeometry(0.05, 0.73, 0.05);
-  for (const [lx, lz] of [[0.02, 0.33], [0.02, -0.33], [1.42, 0.33], [1.42, -0.33]]) {
+  for (const [near, lz] of [[true, 0.33], [true, -0.33], [false, 0.33], [false, -0.33]]) {
     const leg = new THREE.Mesh(legGeo, legMat);
-    leg.position.set(lx, 0.365, lz);
+    leg.position.set(0.02, 0.365, lz);
     leg.castShadow = true;
     table.add(leg);
+    if (!near) farLegs.push(leg);
   }
 }
 scene.add(table);
@@ -714,33 +720,55 @@ scene.add(table);
 const trackGroup = new THREE.Group();
 trackGroup.position.set(0, 0.782, 0);   // track top surface at pivot
 scene.add(trackGroup);
+let trackBed, farStop;
+const trackLips = [], trackFeet = [];
 {
   const railMat = new THREE.MeshStandardMaterial({color: 0x4e5d6c, roughness: 0.38, metalness: 0.65});
   const lipMat  = new THREE.MeshStandardMaterial({color: 0x5d6d7d, roughness: 0.35, metalness: 0.7});
-  const bed = new THREE.Mesh(new THREE.BoxGeometry(TRACK_LEN + 0.10, 0.026, 0.105), railMat);
-  bed.position.set(TRACK_LEN / 2 - 0.02, -0.013, 0);
-  bed.castShadow = bed.receiveShadow = true;
-  trackGroup.add(bed);
+  trackBed = new THREE.Mesh(new THREE.BoxGeometry(1, 0.026, 0.105), railMat);
+  trackBed.position.y = -0.013;
+  trackBed.castShadow = trackBed.receiveShadow = true;
+  trackGroup.add(trackBed);
   for (const zs of [-1, 1]) {
-    const lip = new THREE.Mesh(new THREE.BoxGeometry(TRACK_LEN + 0.10, 0.012, 0.008), lipMat);
-    lip.position.set(TRACK_LEN / 2 - 0.02, 0.006, zs * 0.0525);
+    const lip = new THREE.Mesh(new THREE.BoxGeometry(1, 0.012, 0.008), lipMat);
+    lip.position.set(0, 0.006, zs * 0.0525);
     lip.castShadow = true;
     trackGroup.add(lip);
+    trackLips.push(lip);
   }
   /* levelling feet — the track rests on these, not directly on the table */
   const footMat = new THREE.MeshStandardMaterial({color: 0x272d34, roughness: 0.7, metalness: 0.2});
-  for (const fx of [0.06, TRACK_LEN - 0.06]) {
+  for (let i = 0; i < 2; i++) {
     const foot = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.007, 0.08), footMat);
-    foot.position.set(fx, -0.0295, 0);
+    foot.position.set(0, -0.0295, 0);
     foot.castShadow = true;
     trackGroup.add(foot);
+    trackFeet.push(foot);
   }
   /* far end-stop */
   const stopMat = new THREE.MeshStandardMaterial({color: 0x39434c, roughness: 0.6, metalness: 0.3});
-  const stop = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.05, 0.09), stopMat);
-  stop.position.set(FAR_X + CART_HALF - 0.02, 0.025, 0);
-  stop.castShadow = true;
-  trackGroup.add(stop);
+  farStop = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.05, 0.09), stopMat);
+  farStop.position.set(0, 0.025, 0);
+  farStop.castShadow = true;
+  trackGroup.add(farStop);
+}
+
+/* Lay the length-dependent geometry out for the current P.trackLen.
+   Unit-length (1 m) boxes are scaled along x, everything else is placed. */
+function layoutApparatus() {
+  const L = P.trackLen;
+  trackBed.scale.x = L + 0.10;
+  trackBed.position.x = L / 2 - 0.02;
+  for (const lip of trackLips) { lip.scale.x = L + 0.10; lip.position.x = L / 2 - 0.02; }
+  trackFeet[0].position.x = 0.06;
+  trackFeet[1].position.x = L - 0.06;
+  farStop.position.x = farX() + CART_HALF - 0.02;
+  tableTop.scale.x = L + 0.62;
+  tableTop.position.x = L / 2 + 0.22;
+  for (const leg of farLegs) leg.position.x = L + 0.42;
+  camTarget.x = L / 2 - 0.08;
+  camR = 1.75 + 0.6 * L;      // reframe for the new apparatus size
+  updateCamera();
 }
 
 /* pulley-end bumper: block + orange spring */
@@ -857,8 +885,8 @@ function syncScene() {
   trackGroup.rotation.z = th;
 
   /* riser under far end */
-  const endX = (TRACK_LEN + 0.02) * Math.cos(th);
-  const endY = 0.782 + (TRACK_LEN + 0.02) * Math.sin(th) - 0.026;
+  const endX = (P.trackLen + 0.02) * Math.cos(th);
+  const endY = 0.782 + (P.trackLen + 0.02) * Math.sin(th) - 0.026;
   const hRise = Math.max(0.005, endY - 0.75);
   riser.visible = P.angleDeg > 0.4;
   riser.scale.y = hRise;
@@ -946,6 +974,7 @@ resize();
 /* ═══════════════ UI wiring ═══════════════ */
 const $ = id => document.getElementById(id);
 const sliders = [
+  ['s-len',   'v-len',   'trackLen', v => v.toFixed(2) + ' m'],
   ['s-angle', 'v-angle', 'angleDeg', v => v.toFixed(1) + '°'],
   ['s-start', 'v-start', 'startX',   v => v.toFixed(2) + ' m'],
   ['s-mu',    'v-mu',    'mu',       v => v.toFixed(3)],
@@ -961,6 +990,7 @@ for (const [sid, vid, key, fmt] of sliders) {
     P[key] = parseFloat(s.value);
     out.textContent = fmt(P[key]);
     $('preset').value === 'custom' || markCustomIfUser();
+    if (key === 'trackLen') applyTrackLen();
     if (!S.running && S.t === 0 && (key === 'startX' || key === 'angleDeg' || key === 'mHang')) placeCart();
   };
   s.addEventListener('input', apply);
@@ -968,18 +998,32 @@ for (const [sid, vid, key, fmt] of sliders) {
 }
 let applyingPreset = false;
 function markCustomIfUser() { if (!applyingPreset) $('preset').value = 'custom'; }
+
+/* A new track length rebuilds the apparatus, re-bounds the start-position
+   slider, and — like swapping the physical track — restarts the run. */
+function applyTrackLen() {
+  const sStart = $('s-start'), maxStart = P.trackLen - 0.08;
+  sStart.max = maxStart.toFixed(2);
+  if (P.startX > maxStart) {
+    P.startX = maxStart;
+    sStart.value = maxStart;
+    $('v-start').textContent = maxStart.toFixed(2) + ' m';
+  }
+  layoutApparatus();
+  if (S.running || S.t > 0) reset(); else placeCart();
+}
 $('t-noise').addEventListener('change', e => P.noise = e.target.checked);
 
 const PRESETS = {
-  atwood:  {angleDeg: 0,  startX: 0.85, mu: 0.01,  elast: 0.85, mCart: 0.25, mHang: 0.05, fan: 0,    v0: 0,
+  atwood:  {trackLen: 1.00, angleDeg: 0,  startX: 0.85, mu: 0.01,  elast: 0.85, mCart: 0.25, mHang: 0.05, fan: 0,    v0: 0,
             hint: 'Level track. The 50 g hanging mass accelerates the cart — compare a with mₕg/(m꜀+mₕ). Watch the force trace when the mass hits the floor.'},
-  incline: {angleDeg: 8,  startX: 0.30, mu: 0.01,  elast: 0.85, mCart: 0.25, mHang: 0,    fan: 0,    v0: 0,
+  incline: {trackLen: 1.00, angleDeg: 8,  startX: 0.30, mu: 0.01,  elast: 0.85, mCart: 0.25, mHang: 0,    fan: 0,    v0: 0,
             hint: 'Release from rest on an 8° ramp. Note the IMU ax reads ≈ 0 during free roll — an accelerometer measures proper acceleration.'},
-  fan:     {angleDeg: 0,  startX: 0.88, mu: 0.005, elast: 0.85, mCart: 0.25, mHang: 0,    fan: -0.30, v0: 0,
-            hint: 'A constant 0.30 N fan thrust toward the pulley. Velocity should be a straight line with slope F/m.'},
-  bumper:  {angleDeg: 0,  startX: 0.80, mu: 0.005, elast: 0.90, mCart: 0.25, mHang: 0,    fan: 0,    v0: -0.9,
+  fan:     {trackLen: 2.00, angleDeg: 0,  startX: 1.85, mu: 0.005, elast: 0.85, mCart: 0.25, mHang: 0,    fan: -0.30, v0: 0,
+            hint: 'A constant 0.30 N fan thrust toward the pulley, on the long 2 m track. Velocity should be a straight line with slope F/m.'},
+  bumper:  {trackLen: 1.00, angleDeg: 0,  startX: 0.80, mu: 0.005, elast: 0.90, mCart: 0.25, mHang: 0,    fan: 0,    v0: -0.9,
             hint: 'Push the cart at the spring bumper. Zoom the force trace: the collision is a brief, large force — impulse = Δp.'},
-  friction:{angleDeg: 6,  startX: 0.30, mu: 0.15,  elast: 0.85, mCart: 0.25, mHang: 0,    fan: 0,    v0: 0,
+  friction:{trackLen: 1.00, angleDeg: 6,  startX: 0.30, mu: 0.15,  elast: 0.85, mCart: 0.25, mHang: 0,    fan: 0,    v0: 0,
             hint: 'μ = 0.15 on a 6° ramp: tan 6° < μ, so static friction holds the cart. Raise the angle until it breaks away.'},
   custom:  {hint: 'Your own setup — every slider is live.'},
 };
@@ -992,6 +1036,8 @@ function applyPreset(name) {
   for (const [sid, vid, key, fmt] of sliders) {
     if (key in p) {
       P[key] = p[key];
+      /* widen the start slider's bound before its value is assigned */
+      if (key === 'trackLen') applyTrackLen();
       $(sid).value = p[key];
       $(vid).textContent = fmt(p[key]);
     }

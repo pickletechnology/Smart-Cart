@@ -18,10 +18,11 @@ simulation/
 
 ## What it simulates
 
-The apparatus is a 1.00 m track on a lab table, with:
+The apparatus is a track on a lab table, with:
 
 | Element | Parameter | Range |
 |---|---|---|
+| Track length | table and camera resize with it | 0.60–2.00 m |
 | Track incline | pivots at the pulley end, far end rises | 0–20° |
 | Cart | mass (V1 printed cart ≈ 250 g default) | 150–1500 g |
 | Hanging mass | string over an end pulley, classic modified Atwood | 0–300 g |
