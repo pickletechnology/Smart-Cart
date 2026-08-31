@@ -22,11 +22,25 @@ Smart-Cart/
 │       ├── Wheel_8mm_Bearing_V1.stl         Wheel             ×4
 │       ├── Bearing_Casing_8mm_V1.stl        Bearing housing   ×4
 │       └── Axle_8mm_V1.stl                  Axle              ×2
+├── simulation/
+│   ├── README.md                       Physics model and lab exercises
+│   └── index.html                      Smart Cart Lab — browser simulation
 └── docs/
     ├── WIRING.md                       Pinout and sensor connections
     ├── CALIBRATION.md                  Every tunable constant, and how to set it
     └── BLE_PROTOCOL.md                 Service UUIDs and JSON payload format
 ```
+
+## Simulation
+
+[`simulation/index.html`](simulation/index.html) is **Smart Cart Lab**, a
+browser-based 3D simulation of this cart for physics labs — open it in any
+modern browser, no install or internet needed. Students run the classic
+experiments (hanging mass, inclined track, fan force, bumper collisions,
+friction) with live velocity/acceleration/force graphs, and the simulated
+cart streams the same 20 Hz JSON lines as the real firmware, so a BLE client
+can be developed against it before touching hardware. See
+[`simulation/README.md`](simulation/README.md) for the physics model.
 
 ## Hardware
 

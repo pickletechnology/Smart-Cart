@@ -1,0 +1,1132 @@
+<title>Smart Cart Lab</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#12161b; --panel:#1a2027; --panel-2:#151a20; --line:#2a333d; --line-soft:#222a33;
+    --text:#e8edf2; --muted:#8d99a6; --faint:#5b6672;
+    --cart-red:#d0453a; --cart-red-soft:#e05a4f;
+    --ch-v:#4cc9f0; --ch-a:#f2a541; --ch-f:#ef6461; --ch-x:#7dd181;
+    --ok:#57c785; --chip-idle:#8d99a6;
+    --font-display:'Chakra Petch','IBM Plex Sans',system-ui,sans-serif;
+    --font-body:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--font-body); font-size:14px; line-height:1.45;
+    overflow:hidden;
+  }
+  button{font-family:inherit; cursor:pointer}
+  button:focus-visible, select:focus-visible, input:focus-visible{outline:2px solid var(--ch-v); outline-offset:2px}
+
+  /* ── Shell ── */
+  #app{display:grid; grid-template-rows:52px 1fr; height:100vh}
+  header{
+    display:flex; align-items:center; gap:16px; padding:0 16px;
+    background:var(--panel-2); border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex; align-items:baseline; gap:10px; min-width:0}
+  .brand h1{
+    font-family:var(--font-display); font-size:16px; font-weight:700; margin:0;
+    letter-spacing:.06em; white-space:nowrap;
+  }
+  .brand h1 .accent{color:var(--cart-red-soft)}
+  .brand .sub{font-size:11px; color:var(--faint); letter-spacing:.04em; white-space:nowrap}
+  .spacer{flex:1}
+  .chip{
+    display:inline-flex; align-items:center; gap:7px; padding:3px 10px;
+    border:1px solid var(--line); border-radius:999px;
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; color:var(--chip-idle);
+  }
+  .chip .dot{width:7px; height:7px; border-radius:50%; background:var(--chip-idle)}
+  .chip.live{color:var(--ok); border-color:#2c4436}
+  .chip.live .dot{background:var(--ok); animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.35}}
+  @media (prefers-reduced-motion:reduce){ .chip.live .dot{animation:none} }
+
+  .runbar{display:flex; align-items:center; gap:8px}
+  .btn{
+    background:var(--panel); color:var(--text); border:1px solid var(--line);
+    border-radius:6px; padding:6px 14px; font-size:13px; font-weight:500;
+  }
+  .btn:hover{border-color:var(--faint)}
+  .btn.primary{background:var(--cart-red); border-color:var(--cart-red); color:#fff; font-weight:600}
+  .btn.primary:hover{background:var(--cart-red-soft)}
+  .btn.primary.running{background:#2b3a45; border-color:#3d5261; color:var(--ch-v)}
+  .seg{display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden}
+  .seg button{
+    background:transparent; border:0; color:var(--muted); padding:5px 9px; font-size:12px;
+    font-family:var(--font-mono);
+  }
+  .seg button.on{background:var(--panel); color:var(--text)}
+  .clock{font-family:var(--font-mono); font-size:13px; color:var(--muted); min-width:74px; text-align:right; font-variant-numeric:tabular-nums}
+
+  /* ── Main columns ── */
+  main{display:grid; grid-template-columns:272px 1fr 356px; min-height:0}
+  @media (max-width:1100px){
+    body{overflow:auto}
+    #app{height:auto}
+    main{grid-template-columns:1fr; grid-auto-rows:auto}
+    #viewport{height:52vh}
+  }
+
+  /* ── Left rail: controls ── */
+  #rail{
+    background:var(--panel-2); border-right:1px solid var(--line);
+    padding:14px; overflow-y:auto;
+  }
+  .rail-sec{margin-bottom:18px}
+  .rail-sec h2{
+    font-family:var(--font-display); font-size:11px; font-weight:600; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--faint); margin:0 0 10px;
+  }
+  select{
+    width:100%; background:var(--panel); color:var(--text); border:1px solid var(--line);
+    border-radius:6px; padding:7px 8px; font-family:inherit; font-size:13px;
+  }
+  .ctl{margin-bottom:12px}
+  .ctl .lab{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px}
+  .ctl .lab span:first-child{font-size:12.5px; color:var(--muted)}
+  .ctl .val{font-family:var(--font-mono); font-size:12px; color:var(--text); font-variant-numeric:tabular-nums}
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:22px; background:transparent; margin:0;
+  }
+  input[type=range]::-webkit-slider-runnable-track{height:4px; border-radius:2px; background:var(--line)}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:14px; height:14px; border-radius:50%;
+    background:var(--text); margin-top:-5px; border:2px solid var(--bg);
+  }
+  input[type=range]::-moz-range-track{height:4px; border-radius:2px; background:var(--line)}
+  input[type=range]::-moz-range-thumb{width:12px; height:12px; border-radius:50%; background:var(--text); border:2px solid var(--bg)}
+  .toggle{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px}
+  .toggle span{font-size:12.5px; color:var(--muted)}
+  .switch{position:relative; width:34px; height:19px}
+  .switch input{opacity:0; width:100%; height:100%; position:absolute; margin:0; cursor:pointer}
+  .switch .tr{
+    position:absolute; inset:0; border-radius:999px; background:var(--line); transition:background .15s;
+    pointer-events:none;
+  }
+  .switch .tr::after{
+    content:""; position:absolute; top:2.5px; left:3px; width:14px; height:14px; border-radius:50%;
+    background:var(--text); transition:transform .15s;
+  }
+  .switch input:checked + .tr{background:#2c4436}
+  .switch input:checked + .tr::after{transform:translateX(14px); background:var(--ok)}
+  .hint{font-size:11px; color:var(--faint); margin-top:2px}
+
+  /* ── Viewport ── */
+  #viewport{position:relative; min-width:0; min-height:0; background:var(--bg)}
+  #viewport canvas{display:block}
+  #viewhint{
+    position:absolute; left:12px; bottom:10px; font-size:11px; color:var(--faint);
+    font-family:var(--font-mono); pointer-events:none; letter-spacing:.03em;
+  }
+  #overlay-msg{
+    position:absolute; top:12px; left:50%; transform:translateX(-50%);
+    background:rgba(21,26,32,.88); border:1px solid var(--line); border-radius:6px;
+    padding:5px 12px; font-size:12px; color:var(--muted); pointer-events:none;
+    opacity:0; transition:opacity .25s;
+  }
+  #overlay-msg.show{opacity:1}
+
+  /* ── Right data column ── */
+  #data{
+    background:var(--panel-2); border-left:1px solid var(--line);
+    display:flex; flex-direction:column; overflow-y:auto; padding:12px;
+    gap:12px;
+  }
+  .tiles{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
+  .tile{
+    background:var(--panel); border:1px solid var(--line-soft); border-radius:8px;
+    padding:8px 10px 7px;
+  }
+  .tile .t-lab{
+    font-family:var(--font-display); font-size:10px; font-weight:600; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--faint);
+  }
+  .tile .t-val{
+    font-family:var(--font-mono); font-size:19px; font-weight:500; margin-top:2px;
+    font-variant-numeric:tabular-nums; white-space:nowrap;
+  }
+  .tile .t-unit{font-size:11px; color:var(--faint); margin-left:3px; font-weight:400}
+  .tile.c-v .t-val{color:var(--ch-v)}
+  .tile.c-a .t-val{color:var(--ch-a)}
+  .tile.c-f .t-val{color:var(--ch-f)}
+  .tile.c-x .t-val{color:var(--ch-x)}
+
+  .chartbox{background:var(--panel); border:1px solid var(--line-soft); border-radius:8px; padding:8px 10px 6px}
+  .chartbox .c-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px}
+  .chartbox .c-title{
+    font-family:var(--font-display); font-size:10.5px; font-weight:600; letter-spacing:.1em;
+    text-transform:uppercase;
+  }
+  .chartbox .c-cur{font-family:var(--font-mono); font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums}
+  .chartbox canvas{display:block; width:100%; height:96px}
+
+  /* ── BLE console ── */
+  #console-box{background:var(--panel); border:1px solid var(--line-soft); border-radius:8px; overflow:hidden}
+  #console-head{
+    display:flex; align-items:center; gap:8px; padding:7px 10px;
+    border-bottom:1px solid var(--line-soft); cursor:pointer; user-select:none;
+  }
+  #console-head .c-title{
+    font-family:var(--font-display); font-size:10.5px; font-weight:600; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--muted);
+  }
+  #console-head .uuid{font-family:var(--font-mono); font-size:10px; color:var(--faint); margin-left:auto}
+  #console{
+    font-family:var(--font-mono); font-size:10.5px; line-height:1.55; color:#9fb4c4;
+    height:150px; overflow:auto; padding:6px 10px; white-space:pre;
+  }
+  #console .k{color:var(--faint)}
+
+  /* ── Export row ── */
+  .exportrow{display:flex; gap:8px}
+  .exportrow .btn{flex:1; font-size:12.5px; padding:7px 8px}
+  .rec-info{font-family:var(--font-mono); font-size:11px; color:var(--faint); text-align:center}
+
+  ::-webkit-scrollbar{width:9px; height:9px}
+  ::-webkit-scrollbar-thumb{background:var(--line); border-radius:5px}
+  ::-webkit-scrollbar-track{background:transparent}
+</style>
+
+<div id="app">
+  <header>
+    <div class="brand">
+      <h1>SMART CART <span class="accent">LAB</span></h1>
+      <span class="sub">virtual PASCO_Cart · V1 hardware model</span>
+    </div>
+    <div class="spacer"></div>
+    <span class="chip" id="chip"><span class="dot"></span><span id="chip-txt">ADVERTISING</span></span>
+    <span class="clock" id="clock">t = 0.00 s</span>
+    <div class="seg" id="speedseg" title="Simulation speed">
+      <button data-s="0.25">¼×</button><button data-s="0.5">½×</button><button data-s="1" class="on">1×</button>
+    </div>
+    <div class="runbar">
+      <button class="btn primary" id="btn-run">Run</button>
+      <button class="btn" id="btn-reset">Reset</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ───────── Controls ───────── -->
+    <nav id="rail">
+      <div class="rail-sec">
+        <h2>Experiment</h2>
+        <select id="preset">
+          <option value="atwood">Newton's 2nd law — hanging mass</option>
+          <option value="incline">Inclined track release</option>
+          <option value="fan">Fan cart — constant force</option>
+          <option value="bumper">Collision with spring bumper</option>
+          <option value="friction">Friction investigation</option>
+          <option value="custom">Custom setup</option>
+        </select>
+        <div class="hint" id="preset-hint"></div>
+      </div>
+
+      <div class="rail-sec">
+        <h2>Track</h2>
+        <div class="ctl">
+          <div class="lab"><span>Incline angle</span><span class="val" id="v-angle"></span></div>
+          <input type="range" id="s-angle" min="0" max="20" step="0.5" value="0">
+        </div>
+        <div class="ctl">
+          <div class="lab"><span>Start distance from pulley</span><span class="val" id="v-start"></span></div>
+          <input type="range" id="s-start" min="0.20" max="0.92" step="0.01" value="0.85">
+        </div>
+        <div class="ctl">
+          <div class="lab"><span>Friction coefficient μ</span><span class="val" id="v-mu"></span></div>
+          <input type="range" id="s-mu" min="0" max="0.30" step="0.005" value="0.01">
+        </div>
+        <div class="ctl">
+          <div class="lab"><span>Bumper elasticity</span><span class="val" id="v-elast"></span></div>
+          <input type="range" id="s-elast" min="0.3" max="1" step="0.05" value="0.85">
+        </div>
+      </div>
+
+      <div class="rail-sec">
+        <h2>Cart &amp; loads</h2>
+        <div class="ctl">
+          <div class="lab"><span>Cart mass</span><span class="val" id="v-mcart"></span></div>
+          <input type="range" id="s-mcart" min="0.15" max="1.50" step="0.01" value="0.25">
+        </div>
+        <div class="ctl">
+          <div class="lab"><span>Hanging mass</span><span class="val" id="v-mhang"></span></div>
+          <input type="range" id="s-mhang" min="0" max="0.30" step="0.005" value="0.05">
+        </div>
+        <div class="ctl">
+          <div class="lab"><span>Fan force (+ away from pulley)</span><span class="val" id="v-fan"></span></div>
+          <input type="range" id="s-fan" min="-1.0" max="1.0" step="0.02" value="0">
+        </div>
+        <div class="ctl">
+          <div class="lab"><span>Initial push (− toward pulley)</span><span class="val" id="v-v0"></span></div>
+          <input type="range" id="s-v0" min="-1.2" max="1.2" step="0.05" value="0">
+        </div>
+      </div>
+
+      <div class="rail-sec">
+        <h2>Sensors</h2>
+        <div class="toggle">
+          <span>Sensor noise &amp; quantization</span>
+          <label class="switch"><input type="checkbox" id="t-noise" checked><span class="tr"></span></label>
+        </div>
+        <div class="hint">Models MPU-6050 / HX711 / AS5600 noise, the 5-sample RPM average and the 2 RPM cutoff — exactly as in the V1 firmware.</div>
+      </div>
+    </nav>
+
+    <!-- ───────── 3D viewport ───────── -->
+    <section id="viewport">
+      <div id="overlay-msg"></div>
+      <div id="viewhint">drag · orbit&ensp;|&ensp;scroll · zoom</div>
+    </section>
+
+    <!-- ───────── Data ───────── -->
+    <aside id="data">
+      <div class="tiles">
+        <div class="tile c-x"><div class="t-lab">Position</div><div class="t-val"><span id="r-x">0.850</span><span class="t-unit">m</span></div></div>
+        <div class="tile c-v"><div class="t-lab">Velocity</div><div class="t-val"><span id="r-v">0.000</span><span class="t-unit">m/s</span></div></div>
+        <div class="tile c-a"><div class="t-lab">Accel</div><div class="t-val"><span id="r-a">0.00</span><span class="t-unit">m/s²</span></div></div>
+        <div class="tile c-f"><div class="t-lab">Force</div><div class="t-val"><span id="r-f">0.000</span><span class="t-unit">N</span></div></div>
+        <div class="tile"><div class="t-lab">Wheel</div><div class="t-val"><span id="r-rpm">0.0</span><span class="t-unit">rpm</span></div></div>
+        <div class="tile"><div class="t-lab">az (IMU)</div><div class="t-val"><span id="r-az">1.000</span><span class="t-unit">g</span></div></div>
+      </div>
+
+      <div class="chartbox">
+        <div class="c-head"><span class="c-title" style="color:var(--ch-v)">Velocity</span><span class="c-cur" id="c-v-cur">m/s · 10 s window</span></div>
+        <canvas id="chart-v"></canvas>
+      </div>
+      <div class="chartbox">
+        <div class="c-head"><span class="c-title" style="color:var(--ch-a)">Acceleration</span><span class="c-cur" id="c-a-cur">m/s² · 10 s window</span></div>
+        <canvas id="chart-a"></canvas>
+      </div>
+      <div class="chartbox">
+        <div class="c-head"><span class="c-title" style="color:var(--ch-f)">Force (hook)</span><span class="c-cur" id="c-f-cur">N · 10 s window</span></div>
+        <canvas id="chart-f"></canvas>
+      </div>
+
+      <div id="console-box">
+        <div id="console-head">
+          <span class="c-title">BLE Notify · 20 Hz</span>
+          <span class="uuid">beb5483e…26a8</span>
+        </div>
+        <div id="console"></div>
+      </div>
+
+      <div class="exportrow">
+        <button class="btn" id="btn-csv">Download CSV</button>
+        <button class="btn" id="btn-copy">Copy CSV</button>
+      </div>
+      <div class="rec-info" id="rec-info">0 samples recorded · 60 Hz</div>
+    </aside>
+  </main>
+</div>
+
+<!-- Three.js r128 is vendored so the app works with no internet connection
+     (a lab requirement). MIT-licensed — see the header of the file itself. -->
+<script src="vendor/three.min.js"></script>
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════════════════
+   Smart Cart Lab — a physics-faithful simulation of the Smart Cart V1
+   (ESP32 + MPU-6050 + HX711 load cell + AS5600 wheel encoder).
+
+   Model, sign conventions and sensor pipeline are documented in
+   simulation/README.md. Summary:
+     x  = cart distance from the pulley along the track (m)
+     v  = dx/dt  (positive = away from pulley, up-slope)
+   The cart's IMU x-axis points TOWARD the pulley (direction of travel
+   in the classic experiments), so reported velocity/ax are positive
+   when the cart runs toward the pulley — matching how the real cart
+   is set down on the track.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const G = 9.81;
+
+/* ── Cart / track geometry (metres) — matches the V1 build ── */
+const TRACK_LEN     = 1.00;   // usable track length
+const WHEEL_DIA     = 0.034;  // the printed V1 wheel measures 34 mm
+const WHEEL_R       = WHEEL_DIA / 2;
+const WHEEL_CIRC    = Math.PI * WHEEL_DIA;
+const CART_HALF     = 0.065;  // half length of cart incl. hook
+const BUMP_X        = 0.085;  // hook touches bumper when x reaches this
+const FAR_X         = TRACK_LEN - 0.04;
+const HANG0         = 0.15;   // initial dangle of the mass below the pulley
+const PULLEY_Y      = 0.857;  // world height of pulley axle (0.782 track + 0.075 bracket)
+const MASS_HALF_H   = 0.026;
+const MAX_DROP      = PULLEY_Y - MASS_HALF_H; // mass rests on floor at this depth
+const BUMP_K        = 900;    // bumper spring constant (N/m)
+
+/* ── Firmware constants mirrored from PhysicsCart_V1.ino ── */
+const RPM_THRESHOLD = 2.0;
+const NUM_SAMPLES   = 5;
+const SENSOR_HZ     = 60;
+const BLE_HZ        = 20;
+const PHYS_HZ       = 240;
+const DT            = 1 / PHYS_HZ;
+
+/* ── Parameters (bound to sliders) ── */
+const P = {
+  angleDeg: 0, startX: 0.85, mu: 0.01, elast: 0.85,
+  mCart: 0.25, mHang: 0.05, fan: 0, v0: 0, noise: true,
+};
+
+/* ── Simulation state ── */
+const S = {
+  running: false, speed: 1, t: 0,
+  x: P.startX, v: 0, a: 0,
+  stringLen: P.startX + HANG0,  // fixed while a run is in progress
+  massDepth: HANG0,             // below pulley axle
+  massVel: 0,                   // depth rate when slack (m/s, + = falling)
+  taut: true, massOnFloor: false,
+  tension: 0, bumperF: 0, hookF: 0,
+  wheelAngle: 0,                // rad, accumulates
+  vib: 0, vibPhase: 0,          // impact vibration envelope for the IMU
+  prevAngle: 0,                 // for gyro (incline slider moved mid-run)
+};
+
+/* ── Sensor pipeline state (mirrors firmware) ── */
+const SEN = {
+  rpmSamples: new Array(NUM_SAMPLES).fill(0), idx: 0,
+  ax: 0, ay: 0, az: 1, gx: 0, gy: 0, gz: 0,
+  f: 0, angleDeg: 0, rpm: 0, vel: 0,
+  accSensor: 0, accBle: 0,
+};
+
+const rec = [];               // 60 Hz recording buffer
+let bleLines = [];            // console lines
+let bleDirty = false;
+
+const gauss = () => {
+  let u = 0, w = 0;
+  while (u === 0) u = Math.random();
+  while (w === 0) w = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * w);
+};
+
+/* ═══════════════ Physics step (240 Hz) ═══════════════ */
+function physStep() {
+  const th   = P.angleDeg * Math.PI / 180;
+  const sin  = Math.sin(th), cos = Math.cos(th);
+  const mc   = P.mCart, mh = P.mHang;
+  const N    = mc * G * cos;                       // normal force
+  const muK  = P.mu, muS = P.mu * 1.15;
+
+  /* Taut/slack is a managed state: it changes only through the explicit
+     transitions below (string can't push, mass lands, string snaps taut)
+     so every transition resolves velocities consistently. */
+  if (mh <= 0) S.taut = false;
+
+  /* Bumper forces (springs at both ends, damped by elasticity) */
+  let Fb = 0;                                       // net bumper force (+ = away from pulley)
+  const zeta = (1 - P.elast) * 0.5;
+  const c = 2 * Math.sqrt(BUMP_K * (mc + (S.taut ? mh : 0))) * zeta;
+  S.bumperF = 0;
+  if (S.x < BUMP_X) {                               // pulley-end bumper (hits the hook)
+    const comp = BUMP_X - S.x;
+    S.bumperF = Math.max(0, BUMP_K * comp - c * S.v);
+    Fb += S.bumperF;
+  } else if (S.x > FAR_X) {                         // far end-stop
+    const comp = S.x - FAR_X;
+    Fb -= Math.max(0, BUMP_K * comp + c * S.v);
+  }
+
+  /* Sum of non-tension, non-friction forces on the cart (+ = away from pulley) */
+  const Fdrive = P.fan - mc * G * sin + Fb;
+
+  let a = 0, T = 0;
+
+  if (S.taut) {
+    /* Coupled cart + hanging mass. Mass falls at rate −v.  T = mh(g + a). */
+    const Fnet = Fdrive - mh * G;
+    /* Static friction check */
+    if (Math.abs(S.v) < 1e-3 && Math.abs(Fnet) <= muS * N) {
+      a = 0; S.v = 0; T = mh * G;
+    } else {
+      const fricDir = Math.abs(S.v) > 1e-3 ? Math.sign(S.v) : Math.sign(Fnet);
+      a = (Fnet - fricDir * muK * N) / (mc + mh);
+      T = mh * (G + a);
+      if (T < 0) { T = 0; S.taut = false; }         // string cannot push
+    }
+  }
+
+  if (!S.taut) {
+    /* Cart alone */
+    if (Math.abs(S.v) < 1e-3 && Math.abs(Fdrive) <= muS * N) {
+      a = 0; S.v = 0;
+    } else {
+      const fricDir = Math.abs(S.v) > 1e-3 ? Math.sign(S.v) : Math.sign(Fdrive);
+      a = (Fdrive - fricDir * muK * N) / mc;
+    }
+    T = 0;
+    /* Mass free-falls (or rests) independently while slack */
+    if (mh > 0 && !S.massOnFloor) {
+      S.massVel += G * DT;
+      S.massDepth = Math.min(S.massDepth + S.massVel * DT, MAX_DROP);
+      if (S.massDepth >= MAX_DROP) { S.massVel = 0; S.massOnFloor = true; }
+    }
+  }
+
+  /* Integrate cart (semi-implicit Euler) */
+  S.a = a;
+  S.v += a * DT;
+  S.x += S.v * DT;
+
+  if (S.taut) {
+    S.massDepth = S.stringLen - S.x;
+    S.massVel = -S.v;
+    if (S.massDepth >= MAX_DROP) {                  // mass just landed
+      S.massDepth = MAX_DROP; S.massVel = 0; S.massOnFloor = true; S.taut = false; T = 0;
+    }
+  } else if (mh > 0) {
+    /* Re-tension: cart moved back far enough to pick the mass up again */
+    const limit = S.stringLen - S.x;
+    if (S.massDepth > limit) {
+      /* String snaps taut — resolve velocities by momentum along the string */
+      const u = (mc * (-S.v) + mh * S.massVel) / (mc + mh); // toward-pulley speed
+      S.v = -u; S.massVel = u;
+      S.massDepth = limit; S.massOnFloor = false;
+      S.vib = Math.min(1.5, S.vib + Math.abs(u) * 2);       // jolt shows on the IMU
+    }
+  }
+
+  /* Hard clamp at extreme ends (springs normally prevent reaching these) */
+  if (S.x < 0.02)            { S.x = 0.02; S.v = Math.max(0, S.v); }
+  if (S.x > TRACK_LEN - 0.02){ S.x = TRACK_LEN - 0.02; S.v = Math.min(0, S.v); }
+
+  /* Impact vibration for the IMU: excite on bumper contact */
+  if (S.bumperF > 0.5 || (S.x > FAR_X && Math.abs(S.v) > 0.05)) {
+    S.vib = Math.min(2.0, S.vib + Math.abs(S.v) * 0.12);
+  }
+  S.vib *= Math.exp(-DT * 18);
+  S.vibPhase += DT * 2 * Math.PI * 42;              // ~42 Hz chassis ring
+
+  S.tension = T;
+  S.hookF = T - S.bumperF;   // hook: pull positive, bumper compression negative
+  S.wheelAngle += (-S.v / WHEEL_R) * DT;            // + when rolling toward pulley
+  S.t += DT;
+}
+
+/* ═══════════════ Sensor sampling (60 Hz, firmware pipeline) ═══════════════ */
+function sampleSensors() {
+  const th  = P.angleDeg * Math.PI / 180;
+  const n   = P.noise;
+  const vibA = S.vib * 0.05 * Math.sin(S.vibPhase); // g
+
+  /* IMU: specific force in the cart frame; +x toward pulley (downhill). */
+  const axTrue = (-S.a - G * Math.sin(th)) / G;
+  const azTrue = Math.cos(th) + (-S.a * 0); // perpendicular accel ≈ 0 on the track
+  SEN.ax = axTrue + vibA + (n ? gauss() * 0.003 : 0);
+  SEN.ay = (n ? gauss() * 0.003 : 0);
+  SEN.az = azTrue + vibA * 0.6 + (n ? gauss() * 0.004 : 0);
+
+  /* Gyro: pitch rate about the cart's y-axis (incline slider moved mid-run). */
+  const dTh = (P.angleDeg - S.prevAngle) * SENSOR_HZ; // °/s
+  S.prevAngle = P.angleDeg;
+  SEN.gx = (n ? gauss() * 0.15 : 0);
+  SEN.gy = dTh + (n ? gauss() * 0.15 : 0);
+  SEN.gz = (n ? gauss() * 0.15 : 0);
+
+  /* Load cell (HX711): hook force, 24-bit but noisy at speed */
+  SEN.f = S.hookF + (n ? gauss() * 0.015 : 0);
+
+  /* Wheel encoder (AS5600) → RPM pipeline exactly as firmware */
+  const omega = -S.v / WHEEL_R;                     // rad/s, + toward pulley
+  let rawRPM = omega * 60 / (2 * Math.PI);
+  if (n) rawRPM += gauss() * 0.8;
+  SEN.rpmSamples[SEN.idx] = rawRPM;
+  SEN.idx = (SEN.idx + 1) % NUM_SAMPLES;
+  let avg = 0;
+  for (let i = 0; i < NUM_SAMPLES; i++) avg += SEN.rpmSamples[i];
+  avg /= NUM_SAMPLES;
+  SEN.rpm = Math.abs(avg) < RPM_THRESHOLD ? 0 : avg;
+  SEN.vel = (SEN.rpm / 60) * WHEEL_CIRC;            // + toward pulley
+  SEN.angleDeg = ((S.wheelAngle * 180 / Math.PI) % 360 + 360) % 360;
+
+  /* Record + feed charts (charts show what the sensors report) */
+  const row = {
+    t: S.t, x: S.x, v: SEN.vel, a: -S.a + (n ? gauss() * 0.02 : 0),
+    f: SEN.f, ax: SEN.ax, ay: SEN.ay, az: SEN.az, rpm: SEN.rpm,
+    vTrue: -S.v, aTrue: -S.a, T: S.tension,
+  };
+  rec.push(row);
+  chartV.push(S.t, row.v);
+  chartA.push(S.t, row.a);
+  chartF.push(S.t, row.f);
+}
+
+/* ═══════════════ BLE emitter (20 Hz, firmware JSON format) ═══════════════ */
+function emitBle() {
+  const line =
+    `{"t":${S.t.toFixed(2)},"ax":${SEN.ax.toFixed(3)},"ay":${SEN.ay.toFixed(3)},` +
+    `"az":${SEN.az.toFixed(3)},"gx":${SEN.gx.toFixed(1)},"gy":${SEN.gy.toFixed(1)},` +
+    `"gz":${SEN.gz.toFixed(1)},"f":${SEN.f.toFixed(3)},"a":${SEN.angleDeg.toFixed(1)},` +
+    `"r":${SEN.rpm.toFixed(1)},"v":${SEN.vel.toFixed(3)}}`;
+  bleLines.push(line);
+  if (bleLines.length > 160) bleLines.splice(0, bleLines.length - 160);
+  bleDirty = true;
+}
+
+/* ═══════════════ Strip charts ═══════════════ */
+function makeChart(canvasId, color, decimals) {
+  const cv = document.getElementById(canvasId);
+  const ctx = cv.getContext('2d');
+  const data = [];                                  // {t, y}
+  const WINDOW = 10;
+  function push(t, y) {
+    data.push({t, y});
+    while (data.length && data[0].t < t - WINDOW - 1) data.shift();
+  }
+  function clear() { data.length = 0; }
+  function draw(tNow) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return;
+    if (cv.width !== w * dpr || cv.height !== h * dpr) { cv.width = w * dpr; cv.height = h * dpr; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const t0 = Math.max(0, tNow - WINDOW), t1 = Math.max(WINDOW, tNow);
+    let lo = Infinity, hi = -Infinity;
+    for (const d of data) { if (d.t >= t0) { if (d.y < lo) lo = d.y; if (d.y > hi) hi = d.y; } }
+    if (!isFinite(lo)) { lo = -1; hi = 1; }
+    if (hi - lo < 0.2) { const m = (hi + lo) / 2; lo = m - 0.1; hi = m + 0.1; }
+    const pad = (hi - lo) * 0.15; lo -= pad; hi += pad;
+
+    const X = t => (t - t0) / (t1 - t0) * w;
+    const Y = y => h - (y - lo) / (hi - lo) * h;
+
+    /* grid: vertical each 2 s, horizontal thirds + zero line */
+    ctx.strokeStyle = 'rgba(120,140,160,0.10)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let t = Math.ceil(t0 / 2) * 2; t <= t1; t += 2) { const px = Math.round(X(t)) + .5; ctx.moveTo(px, 0); ctx.lineTo(px, h); }
+    for (let i = 1; i < 3; i++) { const py = Math.round(h * i / 3) + .5; ctx.moveTo(0, py); ctx.lineTo(w, py); }
+    ctx.stroke();
+    if (lo < 0 && hi > 0) {
+      ctx.strokeStyle = 'rgba(160,180,200,0.30)';
+      ctx.beginPath(); const zy = Math.round(Y(0)) + .5; ctx.moveTo(0, zy); ctx.lineTo(w, zy); ctx.stroke();
+    }
+
+    /* scale labels */
+    ctx.fillStyle = 'rgba(140,155,170,0.75)';
+    ctx.font = '9.5px "IBM Plex Mono", monospace';
+    ctx.textBaseline = 'top';    ctx.fillText(hi.toFixed(decimals), 4, 2);
+    ctx.textBaseline = 'bottom'; ctx.fillText(lo.toFixed(decimals), 4, h - 2);
+
+    /* trace */
+    if (data.length > 1) {
+      ctx.strokeStyle = color; ctx.lineWidth = 1.6;
+      ctx.lineJoin = 'round'; ctx.beginPath();
+      let started = false;
+      for (const d of data) {
+        if (d.t < t0 - 0.1) continue;
+        const px = X(d.t), py = Y(d.y);
+        if (!started) { ctx.moveTo(px, py); started = true; } else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      const last = data[data.length - 1];
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(X(last.t), Y(last.y), 2.6, 0, 7); ctx.fill();
+    }
+  }
+  return {push, clear, draw};
+}
+const chartV = makeChart('chart-v', getComputedStyle(document.documentElement).getPropertyValue('--ch-v').trim() || '#4cc9f0', 2);
+const chartA = makeChart('chart-a', getComputedStyle(document.documentElement).getPropertyValue('--ch-a').trim() || '#f2a541', 2);
+const chartF = makeChart('chart-f', getComputedStyle(document.documentElement).getPropertyValue('--ch-f').trim() || '#ef6461', 2);
+
+/* ═══════════════ Three.js scene ═══════════════ */
+const viewport = document.getElementById('viewport');
+const renderer = new THREE.WebGLRenderer({antialias: true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.92;
+viewport.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x12161b);
+scene.fog = new THREE.Fog(0x12161b, 5, 13);
+
+const camera = new THREE.PerspectiveCamera(42, 1, 0.05, 60);
+const camTarget = new THREE.Vector3(0.42, 0.62, 0);
+let camTheta = 0.75, camPhi = 1.18, camR = 2.35;
+function updateCamera() {
+  camera.position.set(
+    camTarget.x + camR * Math.sin(camPhi) * Math.sin(camTheta),
+    camTarget.y + camR * Math.cos(camPhi),
+    camTarget.z + camR * Math.sin(camPhi) * Math.cos(camTheta));
+  camera.lookAt(camTarget);
+}
+updateCamera();
+
+/* ── Lighting: warm key sun + cool hemisphere sky + gentle rim fill.
+   Energy-plausible: one dominant source casts the shadows; ambient comes
+   from the sky term, not a flat constant. ── */
+const hemi = new THREE.HemisphereLight(0xbdd0e4, 0x2c3238, 0.42);
+scene.add(hemi);
+const key = new THREE.DirectionalLight(0xfff1de, 1.05);
+key.position.set(2.6, 3.6, 1.9);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.left = -2; key.shadow.camera.right = 2;
+key.shadow.camera.top = 2;   key.shadow.camera.bottom = -2;
+key.shadow.camera.near = 1;  key.shadow.camera.far = 10;
+key.shadow.bias = -0.0004;
+scene.add(key);
+const fill = new THREE.DirectionalLight(0x9db8d8, 0.30);
+fill.position.set(-2.2, 1.6, -1.8);
+scene.add(fill);
+
+/* ── Floor & room ── */
+const floorMat = new THREE.MeshStandardMaterial({color: 0x1d2329, roughness: 0.95, metalness: 0});
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+const grid = new THREE.GridHelper(14, 28, 0x333c45, 0x272e36);
+grid.position.y = 0.001;
+scene.add(grid);
+
+/* ── Lab table ── */
+const table = new THREE.Group();
+{
+  const topMat = new THREE.MeshStandardMaterial({color: 0x39424c, roughness: 0.72, metalness: 0.08});
+  const legMat = new THREE.MeshStandardMaterial({color: 0x2b323a, roughness: 0.8, metalness: 0.25});
+  const top = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.045, 0.78), topMat);
+  top.position.set(0.72, 0.75 - 0.0225, 0);
+  top.castShadow = top.receiveShadow = true;
+  table.add(top);
+  const legGeo = new THREE.BoxGeometry(0.05, 0.73, 0.05);
+  for (const [lx, lz] of [[0.02, 0.33], [0.02, -0.33], [1.42, 0.33], [1.42, -0.33]]) {
+    const leg = new THREE.Mesh(legGeo, legMat);
+    leg.position.set(lx, 0.365, lz);
+    leg.castShadow = true;
+    table.add(leg);
+  }
+}
+scene.add(table);
+
+/* ── Track group — pivots about the pulley end so the far end rises ── */
+const trackGroup = new THREE.Group();
+trackGroup.position.set(0, 0.782, 0);   // track top surface at pivot
+scene.add(trackGroup);
+{
+  const railMat = new THREE.MeshStandardMaterial({color: 0x4e5d6c, roughness: 0.38, metalness: 0.65});
+  const lipMat  = new THREE.MeshStandardMaterial({color: 0x5d6d7d, roughness: 0.35, metalness: 0.7});
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(TRACK_LEN + 0.10, 0.026, 0.105), railMat);
+  bed.position.set(TRACK_LEN / 2 - 0.02, -0.013, 0);
+  bed.castShadow = bed.receiveShadow = true;
+  trackGroup.add(bed);
+  for (const zs of [-1, 1]) {
+    const lip = new THREE.Mesh(new THREE.BoxGeometry(TRACK_LEN + 0.10, 0.012, 0.008), lipMat);
+    lip.position.set(TRACK_LEN / 2 - 0.02, 0.006, zs * 0.0525);
+    lip.castShadow = true;
+    trackGroup.add(lip);
+  }
+  /* levelling feet — the track rests on these, not directly on the table */
+  const footMat = new THREE.MeshStandardMaterial({color: 0x272d34, roughness: 0.7, metalness: 0.2});
+  for (const fx of [0.06, TRACK_LEN - 0.06]) {
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.007, 0.08), footMat);
+    foot.position.set(fx, -0.0295, 0);
+    foot.castShadow = true;
+    trackGroup.add(foot);
+  }
+  /* far end-stop */
+  const stopMat = new THREE.MeshStandardMaterial({color: 0x39434c, roughness: 0.6, metalness: 0.3});
+  const stop = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.05, 0.09), stopMat);
+  stop.position.set(FAR_X + CART_HALF - 0.02, 0.025, 0);
+  stop.castShadow = true;
+  trackGroup.add(stop);
+}
+
+/* pulley-end bumper: block + orange spring */
+const bumperGroup = new THREE.Group();
+{
+  const blockMat = new THREE.MeshStandardMaterial({color: 0x39434c, roughness: 0.6, metalness: 0.3});
+  const block = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.045, 0.09), blockMat);
+  block.position.set(0.006, 0.0225, 0);
+  block.castShadow = true;
+  bumperGroup.add(block);
+  const springMat = new THREE.MeshStandardMaterial({color: 0xe0862e, roughness: 0.45, metalness: 0.6});
+  const spring = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.035, 12), springMat);
+  spring.rotation.z = Math.PI / 2;
+  spring.position.set(0.033, 0.028, 0);
+  spring.castShadow = true;
+  spring.name = 'spring';
+  bumperGroup.add(spring);
+}
+trackGroup.add(bumperGroup);
+
+/* pulley on a bracket at the track end */
+const pulleyGroup = new THREE.Group();
+let pulleyWheel;
+{
+  const bracketMat = new THREE.MeshStandardMaterial({color: 0x3a444e, roughness: 0.5, metalness: 0.5});
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.012, 0.02), bracketMat);
+  arm.position.set(-0.028, 0.02, 0);
+  arm.castShadow = true;
+  pulleyGroup.add(arm);
+  const post = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.05, 0.02), bracketMat);
+  post.position.set(-0.058, 0.045, 0);
+  post.castShadow = true;
+  pulleyGroup.add(post);
+  pulleyWheel = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.026, 0.026, 0.01, 28),
+    new THREE.MeshStandardMaterial({color: 0xb8452e, roughness: 0.4, metalness: 0.3}));
+  pulleyWheel.rotation.x = Math.PI / 2;
+  pulleyWheel.position.set(-0.058, 0.075, 0);
+  pulleyWheel.castShadow = true;
+  pulleyGroup.add(pulleyWheel);
+}
+trackGroup.add(pulleyGroup);
+
+/* riser under the far end when inclined */
+const riser = new THREE.Mesh(
+  new THREE.BoxGeometry(0.08, 1, 0.12),
+  new THREE.MeshStandardMaterial({color: 0x31383f, roughness: 0.8, metalness: 0.1}));
+riser.castShadow = true;
+scene.add(riser);
+
+/* ── The cart (matches the printed V1: red chassis, four 34 mm wheels) ── */
+const cart = new THREE.Group();
+const wheels = [];
+let cartLed;
+{
+  const bodyMat  = new THREE.MeshStandardMaterial({color: 0xc23a30, roughness: 0.45, metalness: 0.12});
+  const plateMat = new THREE.MeshStandardMaterial({color: 0x22272c, roughness: 0.6,  metalness: 0.3});
+  const wheelMat = new THREE.MeshStandardMaterial({color: 0x1c2126, roughness: 0.55, metalness: 0.2});
+  const hubMat   = new THREE.MeshStandardMaterial({color: 0x8d99a6, roughness: 0.3,  metalness: 0.8});
+
+  const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.125, 0.038, 0.075), bodyMat);
+  chassis.position.y = WHEEL_R + 0.012;
+  chassis.castShadow = true;
+  cart.add(chassis);
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.008, 0.062), plateMat);
+  deck.position.y = WHEEL_R + 0.035;
+  deck.castShadow = true;
+  cart.add(deck);
+  /* force-sensor hook toward the pulley (−x side of cart local frame) */
+  const hook = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.03, 10), hubMat);
+  hook.rotation.z = Math.PI / 2;
+  hook.position.set(-0.075, WHEEL_R + 0.012, 0);
+  hook.castShadow = true;
+  cart.add(hook);
+  /* status LED */
+  cartLed = new THREE.Mesh(
+    new THREE.SphereGeometry(0.004, 10, 10),
+    new THREE.MeshStandardMaterial({color: 0x113311, emissive: 0x0c220c}));
+  cartLed.position.set(0.045, WHEEL_R + 0.041, 0.02);
+  cart.add(cartLed);
+
+  const wheelGeo = new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, 0.009, 22);
+  wheelGeo.rotateX(Math.PI / 2);                    // axis along z
+  const hubGeo = new THREE.CylinderGeometry(0.006, 0.006, 0.011, 10);
+  hubGeo.rotateX(Math.PI / 2);
+  for (const [wx, wz] of [[-0.045, 0.044], [-0.045, -0.044], [0.045, 0.044], [0.045, -0.044]]) {
+    const w = new THREE.Group();
+    const tyre = new THREE.Mesh(wheelGeo, wheelMat);
+    tyre.castShadow = true;
+    const hub = new THREE.Mesh(hubGeo, hubMat);
+    w.add(tyre); w.add(hub);
+    w.position.set(wx, WHEEL_R, wz);
+    cart.add(w);
+    wheels.push(w);
+  }
+}
+trackGroup.add(cart);
+
+/* ── Hanging mass + string ── */
+const massMesh = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.021, 0.021, MASS_HALF_H * 2, 20),
+  new THREE.MeshStandardMaterial({color: 0x707c88, roughness: 0.35, metalness: 0.85}));
+massMesh.castShadow = true;
+scene.add(massMesh);
+const stringGeo = new THREE.BufferGeometry().setFromPoints(
+  [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]);
+const stringLine = new THREE.Line(stringGeo, new THREE.LineBasicMaterial({color: 0xd8dee5}));
+scene.add(stringLine);
+
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+
+function syncScene() {
+  const th = P.angleDeg * Math.PI / 180;
+  trackGroup.rotation.z = th;
+
+  /* riser under far end */
+  const endX = (TRACK_LEN + 0.02) * Math.cos(th);
+  const endY = 0.782 + (TRACK_LEN + 0.02) * Math.sin(th) - 0.026;
+  const hRise = Math.max(0.005, endY - 0.75);
+  riser.visible = P.angleDeg > 0.4;
+  riser.scale.y = hRise;
+  riser.position.set(endX, 0.75 + hRise / 2, 0);
+
+  /* cart along track (local coords — incline comes free) */
+  cart.position.set(S.x, 0, 0);
+  for (const w of wheels) w.rotation.z = -S.wheelAngle;
+
+  /* spring compresses visually */
+  /* spring cylinder's length is its local y-axis (rotated into x) */
+  const spring = bumperGroup.getObjectByName('spring');
+  const comp = Math.max(0, Math.min(1, (BUMP_X - S.x) / 0.03));
+  spring.scale.y = 1 - 0.55 * comp;
+
+  /* pulley + string + mass in world space */
+  pulleyWheel.getWorldPosition(_v1);                 // pulley axle
+  const hasMass = P.mHang > 0.0001;
+  massMesh.visible = hasMass;
+  stringLine.visible = hasMass;
+  if (hasMass) {
+    massMesh.position.set(_v1.x - 0.026, _v1.y - S.massDepth, _v1.z);
+    pulleyWheel.rotation.y = S.wheelAngle * WHEEL_R / 0.026;
+    /* hook world position */
+    _v2.set(S.x - 0.075, WHEEL_R + 0.012, 0);
+    trackGroup.localToWorld(_v2);
+    _v3.set(_v1.x, _v1.y + 0.026, _v1.z);            // over the top of the pulley
+    const pos = stringLine.geometry.attributes.position;
+    pos.setXYZ(0, _v2.x, _v2.y, _v2.z);
+    pos.setXYZ(1, _v3.x, _v3.y, _v3.z);
+    pos.setXYZ(2, massMesh.position.x, massMesh.position.y + MASS_HALF_H, _v1.z);
+    pos.needsUpdate = true;
+  }
+
+  /* LED */
+  if (S.running) {
+    const blink = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : (Math.sin(S.t * 7) > -0.4 ? 1 : 0.15);
+    cartLed.material.color.setHex(0x1a5c2a);
+    cartLed.material.emissive.setRGB(0.05, 0.55 * blink, 0.12);
+  } else {
+    cartLed.material.color.setHex(0x113311);
+    cartLed.material.emissive.setRGB(0.02, 0.1, 0.03);
+  }
+}
+
+/* ── Orbit interaction ── */
+{
+  const el = renderer.domElement;
+  let dragging = false, px = 0, py = 0, pinch = 0;
+  el.addEventListener('pointerdown', e => { dragging = true; px = e.clientX; py = e.clientY; el.setPointerCapture(e.pointerId); });
+  el.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    camTheta -= (e.clientX - px) * 0.006;
+    camPhi   = Math.max(0.25, Math.min(1.45, camPhi - (e.clientY - py) * 0.005));
+    px = e.clientX; py = e.clientY;
+    updateCamera();
+  });
+  el.addEventListener('pointerup',   () => dragging = false);
+  el.addEventListener('pointercancel', () => dragging = false);
+  el.addEventListener('wheel', e => {
+    e.preventDefault();
+    camR = Math.max(0.7, Math.min(6, camR * (1 + e.deltaY * 0.0012)));
+    updateCamera();
+  }, {passive: false});
+  el.addEventListener('touchstart', e => { if (e.touches.length === 2) pinch = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); }, {passive: true});
+  el.addEventListener('touchmove', e => {
+    if (e.touches.length === 2) {
+      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      if (pinch) { camR = Math.max(0.7, Math.min(6, camR * pinch / d)); updateCamera(); }
+      pinch = d;
+    }
+  }, {passive: true});
+}
+
+function resize() {
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(viewport);
+resize();
+
+/* ═══════════════ UI wiring ═══════════════ */
+const $ = id => document.getElementById(id);
+const sliders = [
+  ['s-angle', 'v-angle', 'angleDeg', v => v.toFixed(1) + '°'],
+  ['s-start', 'v-start', 'startX',   v => v.toFixed(2) + ' m'],
+  ['s-mu',    'v-mu',    'mu',       v => v.toFixed(3)],
+  ['s-elast', 'v-elast', 'elast',    v => Math.round(v * 100) + ' %'],
+  ['s-mcart', 'v-mcart', 'mCart',    v => Math.round(v * 1000) + ' g'],
+  ['s-mhang', 'v-mhang', 'mHang',    v => Math.round(v * 1000) + ' g'],
+  ['s-fan',   'v-fan',   'fan',      v => v.toFixed(2) + ' N'],
+  ['s-v0',    'v-v0',    'v0',       v => v.toFixed(2) + ' m/s'],
+];
+for (const [sid, vid, key, fmt] of sliders) {
+  const s = $(sid), out = $(vid);
+  const apply = () => {
+    P[key] = parseFloat(s.value);
+    out.textContent = fmt(P[key]);
+    $('preset').value === 'custom' || markCustomIfUser();
+    if (!S.running && S.t === 0 && (key === 'startX' || key === 'angleDeg' || key === 'mHang')) placeCart();
+  };
+  s.addEventListener('input', apply);
+  out.textContent = fmt(parseFloat(s.value));
+}
+let applyingPreset = false;
+function markCustomIfUser() { if (!applyingPreset) $('preset').value = 'custom'; }
+$('t-noise').addEventListener('change', e => P.noise = e.target.checked);
+
+const PRESETS = {
+  atwood:  {angleDeg: 0,  startX: 0.85, mu: 0.01,  elast: 0.85, mCart: 0.25, mHang: 0.05, fan: 0,    v0: 0,
+            hint: 'Level track. The 50 g hanging mass accelerates the cart — compare a with mₕg/(m꜀+mₕ). Watch the force trace when the mass hits the floor.'},
+  incline: {angleDeg: 8,  startX: 0.30, mu: 0.01,  elast: 0.85, mCart: 0.25, mHang: 0,    fan: 0,    v0: 0,
+            hint: 'Release from rest on an 8° ramp. Note the IMU ax reads ≈ 0 during free roll — an accelerometer measures proper acceleration.'},
+  fan:     {angleDeg: 0,  startX: 0.88, mu: 0.005, elast: 0.85, mCart: 0.25, mHang: 0,    fan: -0.30, v0: 0,
+            hint: 'A constant 0.30 N fan thrust toward the pulley. Velocity should be a straight line with slope F/m.'},
+  bumper:  {angleDeg: 0,  startX: 0.80, mu: 0.005, elast: 0.90, mCart: 0.25, mHang: 0,    fan: 0,    v0: -0.9,
+            hint: 'Push the cart at the spring bumper. Zoom the force trace: the collision is a brief, large force — impulse = Δp.'},
+  friction:{angleDeg: 6,  startX: 0.30, mu: 0.15,  elast: 0.85, mCart: 0.25, mHang: 0,    fan: 0,    v0: 0,
+            hint: 'μ = 0.15 on a 6° ramp: tan 6° < μ, so static friction holds the cart. Raise the angle until it breaks away.'},
+  custom:  {hint: 'Your own setup — every slider is live.'},
+};
+$('preset').addEventListener('change', () => applyPreset($('preset').value));
+function applyPreset(name) {
+  const p = PRESETS[name];
+  $('preset-hint').textContent = p.hint;
+  if (name === 'custom') return;
+  applyingPreset = true;
+  for (const [sid, vid, key, fmt] of sliders) {
+    if (key in p) {
+      P[key] = p[key];
+      $(sid).value = p[key];
+      $(vid).textContent = fmt(p[key]);
+    }
+  }
+  applyingPreset = false;
+  reset();
+}
+
+/* Run / pause / reset */
+const btnRun = $('btn-run');
+btnRun.addEventListener('click', () => setRunning(!S.running));
+$('btn-reset').addEventListener('click', reset);
+function setRunning(on) {
+  if (on && S.t === 0) { S.v = P.v0; }              // apply the initial push at t = 0
+  S.running = on;
+  btnRun.textContent = on ? 'Pause' : (S.t > 0 ? 'Resume' : 'Run');
+  btnRun.classList.toggle('running', on);
+  $('chip').classList.toggle('live', on);
+  $('chip-txt').textContent = on ? 'STREAMING' : (S.t > 0 ? 'PAUSED' : 'ADVERTISING');
+}
+function placeCart() {
+  S.x = P.startX;
+  S.stringLen = P.startX + HANG0;
+  S.massDepth = Math.min(HANG0, MAX_DROP);
+  S.massVel = 0; S.massOnFloor = false; S.taut = P.mHang > 0;
+  S.prevAngle = P.angleDeg;
+}
+function reset() {
+  S.running = false; S.t = 0; S.v = 0; S.a = 0;
+  S.wheelAngle = 0; S.vib = 0; S.tension = 0; S.bumperF = 0; S.hookF = 0;
+  placeCart();
+  SEN.rpmSamples.fill(0); SEN.idx = 0; SEN.accSensor = 0; SEN.accBle = 0;
+  rec.length = 0; bleLines = []; bleDirty = true;
+  chartV.clear(); chartA.clear(); chartF.clear();
+  setRunning(false);
+  btnRun.textContent = 'Run';
+  $('chip-txt').textContent = 'ADVERTISING';
+  updateReadouts();
+}
+$('speedseg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  S.speed = parseFloat(b.dataset.s);
+  for (const x of $('speedseg').children) x.classList.toggle('on', x === b);
+});
+
+/* Console */
+const consoleEl = $('console');
+$('console-head').addEventListener('click', () => {
+  consoleEl.style.display = consoleEl.style.display === 'none' ? 'block' : 'none';
+});
+
+/* CSV export */
+function buildCsv() {
+  let out = 'time_s,position_m,velocity_mps,acceleration_mps2,force_N,ax_g,ay_g,az_g,wheel_rpm,velocity_true_mps,accel_true_mps2,tension_true_N\n';
+  const step = Math.max(1, Math.floor(rec.length / 40000));
+  for (let i = 0; i < rec.length; i += step) {
+    const r = rec[i];
+    out += `${r.t.toFixed(4)},${r.x.toFixed(4)},${r.v.toFixed(4)},${r.a.toFixed(4)},${r.f.toFixed(4)},` +
+           `${r.ax.toFixed(4)},${r.ay.toFixed(4)},${r.az.toFixed(4)},${r.rpm.toFixed(2)},` +
+           `${r.vTrue.toFixed(4)},${r.aTrue.toFixed(4)},${r.T.toFixed(4)}\n`;
+  }
+  return out;
+}
+$('btn-csv').addEventListener('click', () => {
+  const blob = new Blob([buildCsv()], {type: 'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'smart-cart-run.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  flash('CSV download started — if blocked here, use Copy CSV');
+});
+$('btn-copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(buildCsv()); flash('CSV copied to clipboard'); }
+  catch { flash('Clipboard unavailable in this context'); }
+});
+let flashTimer;
+function flash(msg) {
+  const el = $('overlay-msg');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+/* Readouts */
+function updateReadouts() {
+  $('clock').textContent = 't = ' + S.t.toFixed(2) + ' s';
+  $('r-x').textContent   = S.x.toFixed(3);
+  $('r-v').textContent   = SEN.vel.toFixed(3);
+  $('r-a').textContent   = (-S.a).toFixed(2);
+  $('r-f').textContent   = SEN.f.toFixed(3);
+  $('r-rpm').textContent = SEN.rpm.toFixed(1);
+  $('r-az').textContent  = SEN.az.toFixed(3);
+  $('rec-info').textContent = rec.length + ' samples recorded · 60 Hz';
+}
+
+/* ═══════════════ Main loop ═══════════════ */
+let lastFrame = performance.now();
+let physAcc = 0, sensorAcc = 0, bleAcc = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const wall = Math.min(0.1, (now - lastFrame) / 1000);
+  lastFrame = now;
+
+  if (S.running) {
+    physAcc += wall * S.speed;
+    while (physAcc >= DT) {
+      physAcc -= DT;
+      physStep();
+      sensorAcc += DT;
+      if (sensorAcc >= 1 / SENSOR_HZ - 1e-9) { sensorAcc -= 1 / SENSOR_HZ; sampleSensors(); }
+      bleAcc += DT;
+      if (bleAcc >= 1 / BLE_HZ - 1e-9) { bleAcc -= 1 / BLE_HZ; emitBle(); }
+    }
+  }
+
+  syncScene();
+  renderer.render(scene, camera);
+  chartV.draw(S.t); chartA.draw(S.t); chartF.draw(S.t);
+  updateReadouts();
+
+  if (bleDirty) {
+    bleDirty = false;
+    consoleEl.textContent = bleLines.join('\n');
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+}
+
+/* Keyboard: space = run/pause, R = reset */
+window.addEventListener('keydown', e => {
+  if (['INPUT', 'SELECT', 'BUTTON'].includes(e.target.tagName)) return;
+  if (e.code === 'Space') { e.preventDefault(); setRunning(!S.running); }
+  if (e.key === 'r' || e.key === 'R') reset();
+});
+
+applyPreset('atwood');
+requestAnimationFrame(frame);
+</script>
