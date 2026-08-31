@@ -224,6 +224,7 @@
           <option value="custom">Custom setup</option>
         </select>
         <div class="hint" id="preset-hint"></div>
+        <button class="btn" id="btn-defaults" style="width:100%; margin-top:10px; font-size:12.5px">↺ Reset values</button>
       </div>
 
       <div class="rail-sec">
@@ -1027,11 +1028,11 @@ const PRESETS = {
             hint: 'μ = 0.15 on a 6° ramp: tan 6° < μ, so static friction holds the cart. Raise the angle until it breaks away.'},
   custom:  {hint: 'Your own setup — every slider is live.'},
 };
-$('preset').addEventListener('change', () => applyPreset($('preset').value));
-function applyPreset(name) {
-  const p = PRESETS[name];
-  $('preset-hint').textContent = p.hint;
-  if (name === 'custom') return;
+/* Baseline for "Reset values" on a custom setup */
+const DEFAULTS = {trackLen: 1.00, angleDeg: 0, startX: 0.85, mu: 0.01, elast: 0.85,
+                  mCart: 0.25, mHang: 0.05, fan: 0, v0: 0};
+
+function setValues(p) {
   applyingPreset = true;
   for (const [sid, vid, key, fmt] of sliders) {
     if (key in p) {
@@ -1043,8 +1044,29 @@ function applyPreset(name) {
     }
   }
   applyingPreset = false;
+}
+
+$('preset').addEventListener('change', () => applyPreset($('preset').value));
+function applyPreset(name) {
+  const p = PRESETS[name];
+  $('preset-hint').textContent = p.hint;
+  if (name === 'custom') return;
+  setValues(p);
   reset();
 }
+
+$('btn-defaults').addEventListener('click', () => {
+  const name = $('preset').value;
+  if (name === 'custom') {
+    setValues(DEFAULTS);
+    reset();
+  } else {
+    applyPreset(name);
+  }
+  P.noise = true;
+  $('t-noise').checked = true;
+  flash(name === 'custom' ? 'Values reset to defaults' : 'Preset values restored');
+});
 
 /* Run / pause / reset */
 const btnRun = $('btn-run');
