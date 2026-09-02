@@ -6,6 +6,35 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { deflateSync } from 'node:zlib';
+
+// minimal N×1 RGB PNG encoder (for baking material colors into a palette)
+function palettePng(colors) {
+  const n = colors.length;
+  const crcTable = [...Array(256)].map((_, k) => {
+    let c = k;
+    for (let i = 0; i < 8; i++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = buf => { let c = 0xFFFFFFFF; for (const b of buf) c = crcTable[(c ^ b) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+  const chunk = (type, data) => {
+    const out = Buffer.alloc(12 + data.length);
+    out.writeUInt32BE(data.length, 0);
+    out.write(type, 4);
+    data.copy(out, 8);
+    out.writeUInt32BE(crc(Buffer.concat([Buffer.from(type), data])), 8 + data.length);
+    return out;
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(n, 0); ihdr.writeUInt32BE(1, 4);
+  ihdr[8] = 8; ihdr[9] = 2;                       // 8-bit RGB
+  const raw = Buffer.alloc(1 + n * 3);            // filter byte + pixels
+  colors.forEach((c, i) => { raw[1 + i * 3] = c[0]; raw[2 + i * 3] = c[1]; raw[3 + i * 3] = c[2]; });
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+    chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const [outdir, ...files] = process.argv.slice(2);
@@ -56,22 +85,37 @@ function nodeMatrix(nd) {
 for (const f of files) {
   const { json: j, bin } = readGlb(f);
   const name = basename(f, '.glb').replace(/\s+/g, '_');
-  if ((j.images || []).length !== 1) { console.error(`SKIP ${name}: ${j.images ? j.images.length : 0} images (need 1)`); continue; }
-  const iv = j.bufferViews[j.images[0].bufferView];
-  writeFileSync(join(out, name + '.png'), bin.slice(iv.byteOffset || 0, (iv.byteOffset || 0) + iv.byteLength));
+  const nImages = (j.images || []).length;
+  let baked = null;                 // material index -> palette slot, when baking colors
+  if (nImages === 1) {
+    const iv = j.bufferViews[j.images[0].bufferView];
+    writeFileSync(join(out, name + '.png'), bin.slice(iv.byteOffset || 0, (iv.byteOffset || 0) + iv.byteLength));
+  } else if (nImages === 0) {
+    // untextured: bake each material's baseColorFactor into an N×1 palette PNG
+    const mats = j.materials || [{}];
+    const colors = mats.map(m => {
+      const c = (m.pbrMetallicRoughness && m.pbrMetallicRoughness.baseColorFactor) || [1, 1, 1, 1];
+      const srgb = v => Math.round(255 * Math.pow(Math.max(0, Math.min(1, v)), 1 / 2.2));
+      return [srgb(c[0]), srgb(c[1]), srgb(c[2])];
+    });
+    writeFileSync(join(out, name + '.png'), palettePng(colors));
+    baked = colors.length;
+  } else { console.error(`SKIP ${name}: ${nImages} images (need 0 or 1)`); continue; }
   let obj = '', vBase = 1;
   for (const nd of j.nodes) {
     if (nd.mesh === undefined) continue;
     const xf = nodeMatrix(nd);
     for (const prim of j.meshes[nd.mesh].primitives) {
       const pos = accessor(j, bin, prim.attributes.POSITION);
-      const uv = prim.attributes.TEXCOORD_0 !== undefined ? accessor(j, bin, prim.attributes.TEXCOORD_0) : null;
+      const uv = !baked && prim.attributes.TEXCOORD_0 !== undefined ? accessor(j, bin, prim.attributes.TEXCOORD_0) : null;
       const ix = prim.indices !== undefined ? accessor(j, bin, prim.indices) : null;
       const nv = pos.length / 3;
+      const slotU = baked ? ((prim.material || 0) + 0.5) / baked : 0;
       for (let v = 0; v < nv; v++) {
         const p = xf([pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]]);
         obj += `v ${p[0].toFixed(4)} ${p[1].toFixed(4)} ${p[2].toFixed(4)}\n`;
-        obj += uv ? `vt ${uv[v * 2].toFixed(4)} ${(1 - uv[v * 2 + 1]).toFixed(4)}\n` : 'vt 0 0\n';
+        obj += baked ? `vt ${slotU.toFixed(4)} 0.5\n`
+          : uv ? `vt ${uv[v * 2].toFixed(4)} ${(1 - uv[v * 2 + 1]).toFixed(4)}\n` : 'vt 0 0\n';
       }
       const idx = ix || Uint32Array.from({ length: nv }, (_, k) => k);
       for (let t = 0; t < idx.length; t += 3)
@@ -80,5 +124,5 @@ for (const f of files) {
     }
   }
   writeFileSync(join(out, name + '.obj'), obj);
-  console.log(`ok ${name} (${(obj.length / 1024).toFixed(0)} KB obj)`);
+  console.log(`ok ${name}${baked ? ' (baked ' + baked + ' colors)' : ''} (${(obj.length / 1024).toFixed(0)} KB obj)`);
 }

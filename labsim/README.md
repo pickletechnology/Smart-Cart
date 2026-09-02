@@ -13,17 +13,22 @@ embedded. Enter your name at hiring (it goes on your printable transcript).
 
 - **Title screen** over a living city street (traffic, pedestrians, the TPC
   building), then a skippable **cinematic intro**: your character drives in,
-  parks, and walks into the Field Test Division.
+  parks, walks to the front door — and sits down with **R. Fulcrum, Founder &
+  Owner**, who explains exactly what you've signed up for (click / Space
+  through the dialogue).
 - **The lab floor is walkable** (WASD/arrows or click-to-walk, E to use):
   a test bench where the labs run, a workshop desk where the SC-01 gets
   modified, a mail terminal for Marla's memos (many take **replies** — pick
   one, she answers), an equipment wall, the Deep End tank, a records desk with
   your transcript, Engineer #7's taped-off desk… and your cot.
 - **Bench setup, PC-Building-Simulator style**: every lab starts with a parts
-  tray — click a part, click its glowing spot. Cart on the track, pulley
-  clamped past the 10 m mark, hanging mass over the pulley, spring bumper,
-  Cart B, the Deep End's tank/boom/test cylinder. Nothing runs until the
-  bench is built.
+  tray — click a part, click its glowing spot; **right-click a placed part**
+  to take it back. **Drag to orbit the bench, scroll to zoom**; while setting
+  up, the camera frames the whole track so every slot is in reach. Cart on
+  the track, pulley clamped past the 10 m mark, hanging mass over the pulley,
+  spring bumper, Cart B, the Deep End's tank/boom/test cylinder. Nothing runs
+  until the bench is built, and Lab 01 walks first-timers through it step by
+  step.
 - **After each certified lab you clock out**: a night-time sleep cutscene ends
   the day (DAY N COMPLETE), the day counter and your clearance level tick up —
   and the lab wakes up a little more lived-in: coffee cups, takeout cartons
