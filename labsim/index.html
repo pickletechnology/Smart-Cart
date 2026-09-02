@@ -886,7 +886,7 @@ const LABS = [
   controls: {
     tilt: [
       { id: 'surface', label: 'Surface', select: ['metal', 'sand', 'frost'], def: 'sand' },
-      { id: 'angle0', label: 'Start angle', min: 0, max: 15, step: 0.5, def: 0, unit: '°' },
+      { id: 'angle0', label: 'Motor start angle', min: 0, max: 15, step: 0.5, def: 0, unit: '°' },
     ],
     release: [
       { id: 'surface', label: 'Surface', select: ['metal', 'sand', 'frost'], def: 'sand' },
@@ -1417,11 +1417,6 @@ function unplacePart(id) {
 function placePart(id) {
   const pt = (LR.lab.setup || []).find(p => p.id === id);
   if (!pt || LR.placed[id]) return;
-  if (LR.setupSel && LR.setupSel !== id) {
-    const sel = (LR.lab.setup || []).find(p => p.id === LR.setupSel);
-    toast(`That spot takes the ${pt.name} — you're holding the ${sel ? sel.name : '…'}`, 'bad');
-    SFX.wrong(); return;
-  }
   LR.placed[id] = true;
   SFX.buy();
   toast(`${pt.name} installed`, 'good');
@@ -1581,7 +1576,8 @@ function renderProc() {
   for (const s of requiredStatus()) {
     const div = document.createElement('div');
     div.className = 'step' + (s.run ? ' done' : '');
-    div.innerHTML = `<span class="tick">${s.run ? '✔' : '○'}</span><span>${s.req.label}</span>`;
+    const modeName = LR.lab.modes.length > 1 ? (LR.lab.modes.find(m => m.id === s.req.mode) || {}).name : null;
+    div.innerHTML = `<span class="tick">${s.run ? '✔' : '○'}</span><span>${s.req.label}${modeName ? ` <span style="color:var(--faint)">— ${modeName} tab</span>` : ''}</span>`;
     wrap.appendChild(div);
   }
   const ready = requiredStatus().every(s => s.run);
@@ -2290,6 +2286,27 @@ const GFX = (() => {
     sp.scale.set(cnv.width / 110, cnv.height / 110, 1);
     return sp;
   }
+  /* a sprite whose text can be rewritten live (for instrument readouts) */
+  function liveSprite(color, px = 30) {
+    const cnv = document.createElement('canvas');
+    cnv.width = 256; cnv.height = 64;
+    const c2 = cnv.getContext('2d');
+    const tx = new THREE.CanvasTexture(cnv);
+    tx.encoding = THREE.sRGBEncoding;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, transparent: true, depthTest: false }));
+    sp.scale.set(256 / 110, 64 / 110, 1);
+    sp.set = txt => {
+      c2.clearRect(0, 0, 256, 64);
+      c2.font = `600 ${px}px "Chakra Petch", sans-serif`;
+      c2.textAlign = 'center'; c2.textBaseline = 'middle';
+      c2.shadowColor = 'rgba(0,0,0,.75)'; c2.shadowBlur = 5;
+      c2.fillStyle = color;
+      c2.fillText(txt, 128, 32);
+      tx.needsUpdate = true;
+    };
+    return sp;
+  }
+
   /* the SC-01: procedural, upgrades visible */
   let ledMat = null;
   function makeCart(scale = 1) {
@@ -3207,6 +3224,7 @@ const GFX = (() => {
     return m;
   }
   let riserMesh = null;
+  let gaugeGroup = null, gaugeSprite = null, gaugeNeedle = null;
   function labRoom(L) {
     scene.background = new THREE.Color(0x12171e);
     scene.fog = new THREE.Fog(0x12171e, 34, 90);
@@ -3381,6 +3399,7 @@ const GFX = (() => {
     const placed = id => !!LR.placed[id];
     const wants = id => (lab.setup || []).some(pt => pt.id === id && (!pt.modes || pt.modes.includes(LR.mode)));
     if (riserMesh) { world.remove(riserMesh); riserMesh = null; }
+    if (gaugeGroup) { world.remove(gaugeGroup); gaugeGroup = null; gaugeSprite = null; gaugeNeedle = null; }
     const surfCol = SURF_COLOR[LR.ctl.surface] || 0x4e5d6c;
     if (lab.track.type === 'incline') {
       /* the track hinges at its DOWNHILL (far, +x) end, which stays on the bench;
@@ -3401,13 +3420,26 @@ const GFX = (() => {
       riserMesh.position.set(0.45 * Math.cos(th), -0.1 + rh / 2, 0);
       if (wants('gauge')) {
         if (placed('gauge')) {
-          const disc = new THREE.Mesh(new THREE.CircleGeometry(0.5, 24, 0, Math.PI),
-            new THREE.MeshBasicMaterial({ color: 0x46b8e8, transparent: true, opacity: 0.28, side: THREE.DoubleSide }));
-          disc.position.set(0, 0.05, 0.62);
-          const gt2 = textSprite('θ', '#7fd0f5', 26);
-          gt2.position.set(0, 0.75, 0.62); gt2.scale.multiplyScalar(0.5);
-          reg('gauge', disc, gt2);
-        } else addGhost('gauge', 0, 0.02, 0.9, 'Angle gauge');
+          /* a real protractor at the hinge (world space — it measures track vs. bench) */
+          gaugeGroup = new THREE.Group();
+          const disc = new THREE.Mesh(new THREE.CircleGeometry(0.55, 28, Math.PI / 2, Math.PI / 2),
+            new THREE.MeshBasicMaterial({ color: 0x46b8e8, transparent: true, opacity: 0.2, side: THREE.DoubleSide }));
+          gaugeGroup.add(disc);
+          const baseRef = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.014, 0.014), lam(0x8d99a6));
+          baseRef.position.x = -0.31;
+          gaugeGroup.add(baseRef);
+          gaugeNeedle = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.022, 0.022), lam(0xf08c3a));
+          gaugeNeedle.geometry.translate(-0.3, 0, 0);
+          gaugeGroup.add(gaugeNeedle);
+          gaugeSprite = liveSprite('#7fd0f5', 34);
+          gaugeSprite.position.set(-0.55, 0.85, 0);
+          gaugeSprite.set('0.0°');
+          gaugeGroup.add(gaugeSprite);
+          gaugeGroup.position.set(1.15, -0.04, 0.65);
+          gaugeGroup.traverse(o => { o.userData.part = 'gauge'; });
+          world.add(gaugeGroup);
+          placedMeshes.gauge = gaugeGroup;
+        } else addGhost('gauge', 2.8, 0.02, 0.9, 'Angle gauge');
       }
     } else if (lab.track.type === 'hill') {
       trackGroup.rotation.z = 0;
@@ -3589,6 +3621,14 @@ const GFX = (() => {
     }
     updateCartPose();
   }
+  function updateGauge(deg) {
+    if (!gaugeSprite) return;
+    if (Math.abs(deg - (gaugeSprite.lastV || 0)) > 0.04 || gaugeSprite.lastV === undefined) {
+      gaugeSprite.set(deg.toFixed(1) + '°');
+      gaugeSprite.lastV = deg;
+    }
+    if (gaugeNeedle) gaugeNeedle.rotation.z = -deg * Math.PI / 180;
+  }
   function updateCartPose() {
     if (!cartMesh || !LR.lab) return;
     const sim = LR.sim;
@@ -3613,7 +3653,8 @@ const GFX = (() => {
       cartMesh.rotation.z = (sim && sim.x < -0.05) ? th : 0;
       if (!sim) { const h = LR.ctl.h || 1.4; cartMesh.position.set(-h / Math.tan(th), h, 0); cartMesh.rotation.z = th; }
     } else if (LR.lab.track.type === 'incline' && LR.mode === 'tilt') {
-      const thNow = (sim ? sim.theta : (LR.ctl.angle0 || 0)) * Math.PI / 180;
+      const degNow = sim ? sim.theta : (LR.ctl.angle0 || 0);
+      const thNow = degNow * Math.PI / 180;
       const L2 = LR.lab.track.L;
       trackGroup.rotation.z = -thNow;
       trackGroup.position.y = 0.02 + Math.sin(thNow) * L2;
@@ -3623,8 +3664,10 @@ const GFX = (() => {
         riserMesh.scale.y = rh;
         riserMesh.position.set(0.45 * Math.cos(thNow), -0.1 + rh / 2, 0);
       }
+      updateGauge(degNow);
     } else if (LR.lab.track.type === 'incline') {
       cartMesh.position.set(x + 0.5, 0, 0);
+      updateGauge(LR.ctl.angle || 0);
     } else if (LR.lab.track.type === 'spring') {
       cartMesh.position.set(sim ? x : 3 + (LR.ctl.A || 0.5), 0, 0);
     } else {
