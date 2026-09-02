@@ -301,6 +301,19 @@
     animation:dlgpulse 1.6s ease-in-out infinite}
   @keyframes dlgpulse{0%,100%{opacity:.45}50%{opacity:1}}
 
+  /* ── lab briefing popup ── */
+  #labintro{position:fixed; inset:0; z-index:45; display:flex; align-items:center; justify-content:center;
+    background:rgba(8,12,16,.7); backdrop-filter:blur(2px)}
+  #labintro[hidden]{display:none}
+  .libox{width:min(560px,92vw); padding:24px 28px; display:flex; flex-direction:column; gap:14px}
+  .libox .liwing{font-family:var(--font-mono); font-size:10.5px; letter-spacing:.16em; color:var(--safety); text-transform:uppercase}
+  .libox h3{margin:0; font-family:var(--font-display); font-size:22px; letter-spacing:.03em}
+  .lirow{display:flex; gap:14px; align-items:baseline}
+  .lirow span{font-family:var(--font-display); font-size:10.5px; letter-spacing:.12em; color:var(--co);
+    text-transform:uppercase; min-width:104px; text-align:right}
+  .lirow p{margin:0; font-size:13.5px; line-height:1.55; color:var(--ink); flex:1}
+  #li-go{align-self:flex-end; margin-top:4px}
+
   /* ── bench setup tray ── */
   #setup-tray{position:fixed; left:50%; transform:translateX(-50%); bottom:56px; z-index:22; display:flex; gap:9px;
     padding:10px 12px; align-items:center; pointer-events:auto; max-width:94vw; flex-wrap:wrap; justify-content:center}
@@ -466,6 +479,18 @@
   </div>
   <div id="hub-prompt" class="glass" hidden></div>
   <div id="hub-keys">WASD / arrows — walk · E — use · (or click to walk)</div>
+</div>
+
+<!-- ═══ Lab briefing ═══ -->
+<div id="labintro" hidden>
+  <div class="glass libox">
+    <div class="liwing" id="li-wing"></div>
+    <h3 id="li-title"></h3>
+    <div class="lirow"><span>The idea</span><p id="li-idea"></p></div>
+    <div class="lirow"><span>Watch for</span><p id="li-look"></p></div>
+    <div class="lirow"><span>Why it matters</span><p id="li-why"></p></div>
+    <button class="btn primary" id="li-go">To the bench ▸</button>
+  </div>
 </div>
 
 <!-- ═══ Bench setup tray ═══ -->
@@ -778,6 +803,11 @@ const LABS = [
 {
   id: 'l1', wing: 'Kinematics', title: 'Baseline Certification', env: 'chamber',
   brief: 'Prove the SC-01 moves — and that you can measure it with a ruler and a stopwatch. Constant velocity, then constant acceleration.',
+  intro: {
+    idea: 'Motion comes in two flavors today: constant velocity (the tow rig) and constant acceleration (a hanging mass pulling the cart from rest).',
+    look: 'The position column in your data table. Cruise makes it grow by equal steps; boost makes the steps grow. That shape difference IS kinematics.',
+    why: 'Every later lab trusts you to read x, v and t off your own data. Certify the cart — and your own measuring — before anything expensive happens.',
+  },
   needSensor: null, track: { type: 'flat', L: 10 },
   modes: [
     { id: 'cruise', name: 'Cruise', desc: 'tow at constant velocity' },
@@ -843,20 +873,28 @@ const LABS = [
 {
   id: 'l2', wing: 'Dynamics', title: 'The Grip Department', env: 'chamber',
   brief: 'Three surfaces, one tilting track. Find where static friction gives up and how kinetic friction bleeds acceleration.',
+  intro: {
+    idea: 'Static friction holds the cart until the tilt is too steep; kinetic friction drags on it once it slides. Two different coefficients, one tilting track.',
+    look: 'The exact angle where the cart lets go (the events line records it) — that gives μs = tan θ. Then, in a release run, how fast v grows: slower than g·sinθ says μk is stealing acceleration.',
+    why: 'Friction coefficients are how engineers rate every surface the cart will ever roll on. You are writing the SC-01\'s grip spec.',
+  },
   needSensor: 'encoder', track: { type: 'incline', L: 8 },
   modes: [
     { id: 'tilt', name: 'Tilt test', desc: 'raise the angle until the cart slips' },
     { id: 'release', name: 'Release', desc: 'release from rest at a set angle' },
   ],
   controls: {
-    tilt: [{ id: 'surface', label: 'Surface', select: ['metal', 'sand', 'frost'], def: 'sand' }],
+    tilt: [
+      { id: 'surface', label: 'Surface', select: ['metal', 'sand', 'frost'], def: 'sand' },
+      { id: 'angle0', label: 'Start angle', min: 0, max: 15, step: 0.5, def: 0, unit: '°' },
+    ],
     release: [
       { id: 'surface', label: 'Surface', select: ['metal', 'sand', 'frost'], def: 'sand' },
       { id: 'angle', label: 'Incline angle', min: 5, max: 25, step: 0.5, def: 22, unit: '°' },
     ],
   },
   required: [
-    { mode: 'tilt', label: 'Tilt test on SAND', check: s => s.ctl.surface === 'sand' },
+    { mode: 'tilt', label: 'Tilt test on SAND — start below the slip angle', check: s => s.ctl.surface === 'sand' && s.events.slipAngle !== undefined && s.events.slipAngle >= (s.ctl.angle0 || 0) + 1 },
     { mode: 'release', label: 'Release on SAND at 20–25° — let it slide the whole track', check: s => s.ctl.surface === 'sand' && s.ctl.angle >= 20 && s.ctl.angle <= 25 && !s.events.held && s.t[s.t.length - 1] >= 2.2 },
   ],
   setup: [
@@ -866,7 +904,7 @@ const LABS = [
   physics(sim, p) {
     const mu = p[sim.ctl.surface];
     if (sim.mode === 'tilt') {
-      sim.theta = Math.min(28, sim.time * 2.2);                       // slow tilt: 2.2°/s
+      sim.theta = Math.min(28, (sim.ctl.angle0 || 0) + sim.time * 2.2);   // motorized tilt: 2.2°/s from the start angle
       const th = sim.theta * Math.PI / 180;
       if (!sim.slipped && Math.tan(th) > mu.mus) {
         sim.slipped = true;
@@ -923,6 +961,11 @@ const LABS = [
 {
   id: 'l3', wing: 'Energy', title: 'The Conservation Audit', env: 'outdoor',
   brief: 'Mountain Test Range: release from a height, cash gravitational PE into KE, and audit what the gravel patch steals.',
+  intro: {
+    idea: 'Energy is a budget: height buys speed (mgh → ½mv²), and friction in the gravel patch is the fee. Nothing disappears — it just changes account.',
+    look: 'Three speeds in the events line: at the bottom of the ramp, entering the gravel, and leaving it. The drop across the patch is the energy the gravel ate.',
+    why: 'If your audit balances (prediction ≈ measurement, losses accounted for), conservation of energy stops being a formula and becomes bookkeeping you can trust.',
+  },
   needSensor: 'imu', track: { type: 'hill', L: 12 },
   modes: [{ id: 'audit', name: 'Release', desc: 'release from the ramp' }],
   controls: {
@@ -996,6 +1039,11 @@ const LABS = [
 {
   id: 'l4', wing: 'Momentum', title: 'Impact Assessment', env: 'chamber',
   brief: 'Slam the SC-01 into a calibrated bumper and into Cart B. Impulse is the area under the force–time curve — and now you have the sensor to see it.',
+  intro: {
+    idea: 'Momentum p = mv is what collisions trade. The load cell watches the trade happen: impulse (∫F dt, the area under the F–t spike) equals the change in momentum.',
+    look: 'The impulse and contact time in the events line after the bumper hit, and the before/after velocities in the collisions — velcro sticks (momentum shared), spring bounces (momentum AND kinetic energy survive).',
+    why: 'J = Δp is why airbags are soft and bumpers are springy: same momentum change, longer contact, smaller force. You\'re about to measure that.',
+  },
   needSensor: 'loadcell', track: { type: 'flat', L: 10 },
   modes: [
     { id: 'bumper', name: 'Bumper', desc: 'launch into the spring bumper' },
@@ -1100,6 +1148,11 @@ const LABS = [
 {
   id: 'l5', wing: 'Oscillation', title: 'Resonance Division', env: 'chamber',
   brief: 'Bolt the cart to the reference spring and let it sing. The period hides the spring constant; the amplitude sets the top speed.',
+  intro: {
+    idea: 'A cart on a spring oscillates with a period T = 2π√(m/k) that doesn\'t care about amplitude — only mass and spring stiffness set the beat.',
+    look: 'The zero-crossing timestamps in the events line: the gap between same-direction crossings is one full period. Then add payload and watch T stretch.',
+    why: 'Measure T, extract k, then PREDICT the heavier period before you run it. Prediction-then-measurement is the whole game of physics.',
+  },
   needSensor: null, track: { type: 'spring', L: 6 },
   modes: [{ id: 'osc', name: 'Oscillate', desc: 'pull, release, record' }],
   controls: {
@@ -1172,6 +1225,11 @@ const LABS = [
 {
   id: 'l6', wing: 'Rotation', title: 'The Spin Cycle', env: 'chamber',
   brief: 'The wheel IS the sensor. Tie the cart together with v = ωr, rolling without slipping — one lab left after this.',
+  intro: {
+    idea: 'Rolling without slipping locks spin to travel: v = ωr. The encoder counts wheel turns, and that alone tells you everything about the cart\'s motion.',
+    look: 'The RPM readings at t = 1 s and t = 3 s in the events line — convert them to rad/s and they should agree perfectly with the velocity column.',
+    why: 'Every odometer, mouse wheel and robot drivetrain works exactly this way. Certify it here and the SC-01\'s encoder becomes a trusted instrument.',
+  },
   needSensor: null, track: { type: 'flat', L: 10 },
   modes: [{ id: 'roll', name: 'Boost & roll', desc: 'constant thrust; watch the wheel spin up' }],
   controls: {
@@ -1226,6 +1284,11 @@ const LABS = [
 {
   id: 'l7', wing: 'Fluids', title: 'The Deep End', env: 'chamber',
   brief: 'The Fluids Division owns one tank and many opinions. Hang the standard test cylinder from the load-cell boom, lower it in, and let Archimedes do the accounting.',
+  intro: {
+    idea: 'A submerged object is pushed up by exactly the weight of fluid it shoves aside: F_b = ρVg. That\'s Archimedes, and the load cell can feel it directly.',
+    look: 'The force reading falling as the cylinder goes under — it drops steadily while submerging, then goes flat once fully under. Air weight minus submerged weight IS the buoyant force.',
+    why: 'From one dunk you can compute the density of an unknown fluid. Ships float, hydrometers work, and the Deep End gets certified — same equation.',
+  },
   needSensor: 'loadcell', track: { type: 'tank', L: 4 },
   modes: [
     { id: 'weigh', name: 'Weigh in air', desc: 'hang the cylinder, read its dry weight' },
@@ -1450,7 +1513,17 @@ function enterLab(lab) {
   showScreen('scr-lab');
   renderSetupTray();
   if (lab.setup) toast('🔧 Bench setup — place the equipment before you run', 'story');
+  if (lab.intro && !SV.labs[lab.id]?.done) showLabIntro(lab);
 }
+function showLabIntro(lab) {
+  $('li-wing').textContent = `LAB 0${LABS.indexOf(lab) + 1} · ${lab.wing.toUpperCase()} · MISSION BRIEFING`;
+  $('li-title').textContent = lab.title;
+  $('li-idea').textContent = lab.intro.idea;
+  $('li-look').textContent = lab.intro.look;
+  $('li-why').textContent = lab.intro.why;
+  $('labintro').hidden = false;
+}
+$('li-go').addEventListener('click', () => { $('labintro').hidden = true; SFX.click(); });
 function renderModes() {
   const seg = $('lr-modes'); seg.innerHTML = '';
   seg.style.display = LR.lab.modes.length > 1 ? 'flex' : 'none';
@@ -3169,14 +3242,16 @@ const GFX = (() => {
     for (const lx of [-1.1, L / 2 + 0.35, L + 1.8]) for (const lz of [-0.82, 0.82])
       box(0.12, 0.56, 0.12, legMat, lx, -0.64, lz);
   }
-  function buildRail(parent, len, color) {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(len + 0.7, 0.1, 0.5), lam(color || 0x4e5d6c));
-    rail.position.set(len / 2, -0.05, 0);
+  function buildRail(parent, len, color, noTail) {
+    const tail = noTail ? 0.05 : 0.35;                 // inclined rails keep nothing behind the hinge
+    const rl = len + 0.35 + tail, rc = (len + 0.35 - tail) / 2;
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(rl, 0.1, 0.5), lam(color || 0x4e5d6c));
+    rail.position.set(rc, -0.05, 0);
     rail.castShadow = rail.receiveShadow = true;
     parent.add(rail);
     for (const zs of [-0.27, 0.27]) {
-      const lip = new THREE.Mesh(new THREE.BoxGeometry(len + 0.7, 0.05, 0.06), lam(0x5d6d7d));
-      lip.position.set(len / 2, 0.005, zs);
+      const lip = new THREE.Mesh(new THREE.BoxGeometry(rl, 0.05, 0.06), lam(0x5d6d7d));
+      lip.position.set(rc, 0.005, zs);
       lip.castShadow = true;
       parent.add(lip);
     }
@@ -3308,17 +3383,22 @@ const GFX = (() => {
     if (riserMesh) { world.remove(riserMesh); riserMesh = null; }
     const surfCol = SURF_COLOR[LR.ctl.surface] || 0x4e5d6c;
     if (lab.track.type === 'incline') {
-      const th = (LR.mode === 'tilt' ? 0 : (LR.ctl.angle || 0)) * Math.PI / 180;
+      /* the track hinges at its DOWNHILL (far, +x) end, which stays on the bench;
+         a scissor riser jacks the start end up above the bench — nothing dips through */
+      const th = (LR.mode === 'tilt' ? (LR.ctl.angle0 || 0) : (LR.ctl.angle || 0)) * Math.PI / 180;
       trackGroup.rotation.z = -th;
-      trackGroup.position.set(0, 0.02, 0);
-      buildRail(trackGroup, L, surfCol);
-      // scissor riser lifting the far end off the bench (world-space, not tilted)
+      trackGroup.position.set(0, 0.02 + Math.sin(th) * L, 0);
+      buildRail(trackGroup, L, surfCol, true);
+      const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.62, 12).rotateX(Math.PI / 2), lam(0x31383f));
+      hinge.position.set(L + 0.1, -0.06, 0);
+      hinge.castShadow = true;
+      trackGroup.add(hinge);
       riserMesh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1, 0.24), lam(0x31383f));
       riserMesh.castShadow = true;
       world.add(riserMesh);
-      const rh = Math.max(0.02, Math.sin(th) * (L - 0.5));
+      const rh = Math.max(0.03, 0.12 + Math.sin(th) * (L - 0.45));
       riserMesh.scale.y = rh;
-      riserMesh.position.set(Math.cos(th) * (L - 0.5), -0.1 + rh / 2, 0);
+      riserMesh.position.set(0.45 * Math.cos(th), -0.1 + rh / 2, 0);
       if (wants('gauge')) {
         if (placed('gauge')) {
           const disc = new THREE.Mesh(new THREE.CircleGeometry(0.5, 24, 0, Math.PI),
@@ -3533,14 +3613,15 @@ const GFX = (() => {
       cartMesh.rotation.z = (sim && sim.x < -0.05) ? th : 0;
       if (!sim) { const h = LR.ctl.h || 1.4; cartMesh.position.set(-h / Math.tan(th), h, 0); cartMesh.rotation.z = th; }
     } else if (LR.lab.track.type === 'incline' && LR.mode === 'tilt') {
-      const thNow = (sim ? sim.theta : 0) * Math.PI / 180;
+      const thNow = (sim ? sim.theta : (LR.ctl.angle0 || 0)) * Math.PI / 180;
+      const L2 = LR.lab.track.L;
       trackGroup.rotation.z = -thNow;
+      trackGroup.position.y = 0.02 + Math.sin(thNow) * L2;
       cartMesh.position.set(x + 1, 0, 0);
       if (riserMesh) {
-        const L2 = LR.lab.track.L;
-        const rh = Math.max(0.02, Math.sin(thNow) * (L2 - 0.5));
+        const rh = Math.max(0.03, 0.12 + Math.sin(thNow) * (L2 - 0.45));
         riserMesh.scale.y = rh;
-        riserMesh.position.set(Math.cos(thNow) * (L2 - 0.5), -0.1 + rh / 2, 0);
+        riserMesh.position.set(0.45 * Math.cos(thNow), -0.1 + rh / 2, 0);
       }
     } else if (LR.lab.track.type === 'incline') {
       cartMesh.position.set(x + 0.5, 0, 0);
@@ -3617,7 +3698,11 @@ const GFX = (() => {
         sun.position.set(tx + 5, 12, 9); sun.target.position.set(tx, 0, 0);
       } else {
         const cx = LR.sim ? clamp(LR.sim.x, -3, LR.lab.track.L) : 2;
-        const cy = LR.sim && LR.lab.track.type === 'hill' ? LR.sim.y * 0.5 : (LR.lab && LR.lab.track.type === 'hill' ? 0.7 : 0);
+        let cy = LR.sim && LR.lab.track.type === 'hill' ? LR.sim.y * 0.5 : (LR.lab && LR.lab.track.type === 'hill' ? 0.7 : 0);
+        if (LR.lab && LR.lab.track.type === 'incline') {
+          const thC = (LR.mode === 'tilt' ? (LR.sim ? LR.sim.theta : LR.ctl.angle0 || 0) : (LR.ctl.angle || 0)) * Math.PI / 180;
+          cy = Math.sin(thC) * Math.max(0, LR.lab.track.L - (cx + 1)) * 0.55;
+        }
         tx = cx + 1.6; ty = 0.55 + cy * 0.7;
         sun.position.set(cx + 5, 12, 9);
         sun.target.position.set(cx, 0, 0);
@@ -3740,6 +3825,12 @@ $('btn-snd').addEventListener('click', () => {
 addEventListener('keydown', e => {
   if ((e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') && GFX.dialogActive() && !e.repeat) {
     e.preventDefault(); GFX.advanceDialog(); return;
+  }
+  if (!$('labintro').hidden) {
+    if (e.code === 'Escape' || e.code === 'Space' || e.code === 'Enter') {
+      e.preventDefault(); $('labintro').hidden = true;
+    }
+    return;
   }
   if (e.code === 'Space' && screenNow === 'lab' && !e.repeat && document.activeElement.tagName !== 'INPUT') {
     e.preventDefault(); LR.running ? stopRun(false) : startRun();
