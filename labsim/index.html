@@ -785,8 +785,8 @@ const LABS = [
     boost: [{ id: 'mh', label: 'Hanging mass', min: 0.05, max: 0.2, step: 0.01, def: 0.1, unit: 'kg' }],
   },
   required: [
-    { mode: 'cruise', label: 'One cruise pass (any speed)' },
-    { mode: 'boost', label: 'One boost pass (any hanging mass)' },
+    { mode: 'cruise', label: 'One cruise pass — let it run at least 3 s', check: r => r.t[r.t.length - 1] >= 3 },
+    { mode: 'boost', label: 'One boost pass — let it run at least 2 s', check: r => r.t[r.t.length - 1] >= 2 },
   ],
   setup: [
     { id: 'cart', name: 'SC-01 Smart Cart', small: 'on the track, hook forward' },
@@ -802,11 +802,17 @@ const LABS = [
     const cr = ctx.runs.cruise, bo = ctx.runs.boost;
     const mh = bo.ctl.mh;
     const a = mh * G / (0.25 + mh);
+    /* interval endpoints are picked from rows that actually exist in the
+       student's own table (rows come every 0.5 s up to the last sample) */
+    const tEnd = cr.t[cr.t.length - 1];
+    const tB = Math.max(2, Math.floor(tEnd * 2) / 2);
+    const tA = tB >= 4 ? 1.0 : 0.5;
+    const dT = tB - tA;
     return [
-      { text: `<b>Cruise pass.</b> Using your data table, find the cart's average velocity between <code>t = 2.0 s</code> and <code>t = 6.0 s</code>.`,
-        calc: (atT(cr, 6).x - atT(cr, 2).x) / 4, unit: 'm/s', units: UNIT_SETS.vel,
+      { text: `<b>Cruise pass.</b> Using your data table, find the cart's average velocity between <code>t = ${tA.toFixed(1)} s</code> and <code>t = ${tB.toFixed(1)} s</code>.`,
+        calc: (atT(cr, tB).x - atT(cr, tA).x) / dT, unit: 'm/s', units: UNIT_SETS.vel,
         hint: 'Average velocity = Δx / Δt. Read x at both times from your table.',
-        sol: `x(6.0) = ${r3(atT(cr, 6).x)} m, x(2.0) = ${r3(atT(cr, 2).x)} m\nv_avg = Δx/Δt = (${r3(atT(cr, 6).x)} − ${r3(atT(cr, 2).x)}) / 4.0` },
+        sol: `x(${tB.toFixed(1)}) = ${r3(atT(cr, tB).x)} m, x(${tA.toFixed(1)}) = ${r3(atT(cr, tA).x)} m\nv_avg = Δx/Δt = (${r3(atT(cr, tB).x)} − ${r3(atT(cr, tA).x)}) / ${dT.toFixed(1)}` },
       { text: `If the cruise pass continued at this velocity, how far would the cart travel in <code>12.0 s</code> (from t = 0)?`,
         calc: cr.ctl.v * 12, unit: 'm', units: UNIT_SETS.dist,
         hint: 'Constant velocity: x = v·t.',
@@ -815,9 +821,9 @@ const LABS = [
         calc: 2 * atT(bo, 2).x / 4, unit: 'm/s²', units: UNIT_SETS.acc,
         hint: 'Solve x = ½at² for a:  a = 2x/t².',
         sol: `x(2.0) = ${r3(atT(bo, 2).x)} m\na = 2x/t² = 2(${r3(atT(bo, 2).x)})/(2.0)²` },
-      { text: `Using that acceleration, what velocity does the boost cart reach at <code>t = 3.0 s</code>?`,
+      { text: `Using that acceleration, what velocity <em>would</em> the boost cart reach at <code>t = 3.0 s</code> if the pull continued past the end of the track?`,
         calc: a * 3, unit: 'm/s', units: UNIT_SETS.vel,
-        hint: 'From rest: v = a·t.',
+        hint: 'From rest: v = a·t. This one is a prediction — no table row needed.',
         sol: `v = a·t = ${r3(a)} × 3.0` },
       { mcq: true, text: `On a position–time graph, the <b>slope</b> at a point equals the object's…`,
         choices: ['velocity at that moment', 'acceleration at that moment', 'displacement so far', 'distance from the origin'],
@@ -848,7 +854,7 @@ const LABS = [
   },
   required: [
     { mode: 'tilt', label: 'Tilt test on SAND', check: s => s.ctl.surface === 'sand' },
-    { mode: 'release', label: 'Release on SAND at 20–25° (it must actually slide)', check: s => s.ctl.surface === 'sand' && s.ctl.angle >= 20 && s.ctl.angle <= 25 && !s.events.held },
+    { mode: 'release', label: 'Release on SAND at 20–25° — let it slide the whole track', check: s => s.ctl.surface === 'sand' && s.ctl.angle >= 20 && s.ctl.angle <= 25 && !s.events.held && s.t[s.t.length - 1] >= 2.2 },
   ],
   setup: [
     { id: 'cart', name: 'SC-01 Smart Cart', small: 'on the tilt table' },
@@ -922,7 +928,7 @@ const LABS = [
       { id: 'payload', label: 'Payload', min: 0, max: 0.3, step: 0.1, def: 0, unit: 'kg' },
     ],
   },
-  required: [{ mode: 'audit', label: 'One release (any height)' }],
+  required: [{ mode: 'audit', label: 'One release — let it run past the gravel', check: r => r.events.vAfter !== undefined }],
   setup: [
     { id: 'cart', name: 'SC-01 Smart Cart', small: 'at the top of the ramp' },
     { id: 'gravel', name: 'Gravel audit kit', small: '1.5 m patch, 5.0–6.5 m' },
@@ -1001,9 +1007,9 @@ const LABS = [
     ],
   },
   required: [
-    { mode: 'bumper', label: 'One bumper impact' },
-    { mode: 'collide', label: 'VELCRO collision (any masses)', check: s => s.ctl.coupling === 'velcro' },
-    { mode: 'collide', label: 'SPRING collision (any masses)', check: s => s.ctl.coupling === 'spring' },
+    { mode: 'bumper', label: 'One full bumper impact (rebound recorded)', check: r => r.events.J !== undefined },
+    { mode: 'collide', label: 'VELCRO collision (let them collide)', check: s => s.ctl.coupling === 'velcro' && s.events.v1After !== undefined },
+    { mode: 'collide', label: 'SPRING collision (let them collide)', check: s => s.ctl.coupling === 'spring' && s.events.v1After !== undefined },
   ],
   setup: [
     { id: 'cart', name: 'SC-01 Smart Cart', small: 'load cell facing forward' },
@@ -1100,8 +1106,8 @@ const LABS = [
     ],
   },
   required: [
-    { mode: 'osc', label: 'Oscillate with NO payload', check: s => s.ctl.payload === 0 },
-    { mode: 'osc', label: 'Oscillate with 0.2 kg payload', check: s => Math.abs(s.ctl.payload - 0.2) < 0.01 },
+    { mode: 'osc', label: 'Oscillate with NO payload (5 crossings)', check: s => s.ctl.payload === 0 && s.events.T !== undefined },
+    { mode: 'osc', label: 'Oscillate with 0.2 kg payload (5 crossings)', check: s => Math.abs(s.ctl.payload - 0.2) < 0.01 && s.events.T !== undefined },
   ],
   setup: [
     { id: 'cart', name: 'SC-01 Smart Cart', small: 'bolts to the spring' },
@@ -1168,7 +1174,7 @@ const LABS = [
   controls: {
     roll: [{ id: 'payload', label: 'Payload', min: 0, max: 0.3, step: 0.1, def: 0, unit: 'kg' }],
   },
-  required: [{ mode: 'roll', label: 'One boost pass' }],
+  required: [{ mode: 'roll', label: 'One boost pass — let it run at least 3 s', check: r => r.events.rpm3 !== undefined }],
   setup: [
     { id: 'cart', name: 'SC-01 Smart Cart', small: 'encoder wheel down' },
     { id: 'gate', name: 'Telemetry gate', small: 'checks the spin count at 8 m' },
