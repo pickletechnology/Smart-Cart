@@ -1768,7 +1768,18 @@ function renderWorksheet() {
   const tierEl = document.createElement('span');
   tierEl.className = 'tier';
   tierEl.textContent = s.attempts === 0 ? 'full pay' : s.solShown ? 'solution shown · 40% pay' : '70% pay';
-  foot.append(hintB, tierEl);
+  const skipB = document.createElement('button');
+  skipB.className = 'btn small';
+  skipB.style.opacity = '.5';
+  skipB.textContent = '⏭ Skip (testing)';
+  skipB.title = 'Marks this question complete for $0 pay — testing only';
+  skipB.addEventListener('click', () => {
+    s.done = true; s.skipped = true;
+    persist(); SFX.click();
+    toast('Question skipped — $0 (testing)', '');
+    renderWorksheet();
+  });
+  foot.append(hintB, skipB, tierEl);
   card.appendChild(foot);
   body.appendChild(card);
   const close = document.createElement('div');
