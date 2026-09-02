@@ -177,9 +177,10 @@
     background:rgba(8,12,16,.78); backdrop-filter:blur(3px)}
   #ws[hidden]{display:none}
   .wsbox{width:min(660px,94vw); max-height:92vh; overflow-y:auto; padding:22px 24px; display:flex; flex-direction:column; gap:13px}
-  .wsbox .wtop{display:flex; justify-content:space-between; align-items:baseline}
-  .wsbox .wtop h3{margin:0; font-family:var(--font-display); font-size:16px}
+  .wsbox .wtop{display:flex; align-items:center; gap:12px}
+  .wsbox .wtop h3{margin:0; font-family:var(--font-display); font-size:16px; flex:1}
   .wsbox .wtop .prog{font-family:var(--font-mono); font-size:12px; color:var(--faint)}
+  #ws-refresh{white-space:nowrap}
   .qcard{border:1px solid var(--line); border-radius:11px; padding:14px 16px; display:flex; flex-direction:column; gap:10px}
   .qcard .qnum{font-family:var(--font-display); font-size:11px; letter-spacing:.1em; color:var(--co); text-transform:uppercase}
   .qcard .qtext{font-size:15px; line-height:1.55}
@@ -424,7 +425,9 @@
 <!-- ═══ Worksheet ═══ -->
 <div id="ws" hidden>
   <div class="glass wsbox">
-    <div class="wtop"><h3 id="ws-title"></h3><span class="prog" id="ws-prog"></span></div>
+    <div class="wtop"><h3 id="ws-title"></h3>
+      <button class="btn small" id="ws-refresh" title="Rebuild the questions from your most recent recorded runs">⟳ Use latest runs</button>
+      <span class="prog" id="ws-prog"></span></div>
     <div id="ws-body"></div>
   </div>
 </div>
@@ -1658,16 +1661,28 @@ function labState(id) {
   return SV.labs[id];
 }
 $('btn-worksheet').addEventListener('click', openWorksheet);
-function openWorksheet() {
-  if (!LR.wsQ) {
-    const ctx = buildCtx();
-    try { LR.wsQ = LR.lab.questions(ctx); }
-    catch (e) { toast('Complete the procedure runs first', 'bad'); return; }
+/* (re)build the questions from the newest matching runs, so the numbers in the
+   question text are always the ones sitting in the data table right now */
+function regenWorksheet(announce) {
+  const ctx = buildCtx();
+  try {
+    LR.wsQ = LR.lab.questions(ctx);
+    if (announce) { toast('Worksheet refreshed — questions now use your latest runs', 'good'); SFX.click(); }
+    return true;
+  } catch (e) {
+    if (!LR.wsQ) toast('Complete the procedure runs first', 'bad');
+    return !!LR.wsQ;
   }
+}
+function openWorksheet() {
+  if (!regenWorksheet(false)) return;
   $('ws-title').textContent = `Worksheet — ${LR.lab.title}`;
   $('ws').hidden = false;
   renderWorksheet();
 }
+$('ws-refresh').addEventListener('click', () => {
+  if (regenWorksheet(true)) renderWorksheet();
+});
 function qState(i) {
   const st = labState(LR.lab.id);
   if (!st.q[i]) st.q[i] = { attempts: 0, tier: 1, done: false, solShown: false };
