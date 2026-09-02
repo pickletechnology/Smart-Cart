@@ -1951,7 +1951,7 @@ function hubObjective() {
   $('hub-obj').textContent =
     unread ? `📥 new mail (${unread}) — desk terminal` :
     frag ? '⚿ something was left behind — look around the lab' :
-    !next ? '🏆 fully certified — records desk has your transcript' :
+    !next ? '🏆 fully certified — CertViewer on the terminal has your transcript' :
     needs ? `🔧 LAB 0${LABS.indexOf(next) + 1} needs the ${SENSORS.find(s => s.id === next.needSensor).name.split(' ')[0]} — workshop desk` :
     `🧪 LAB 0${LABS.indexOf(next) + 1} · ${next.title} — test bench`;
 }
@@ -2397,10 +2397,11 @@ const GFX = (() => {
     // shoulder drop about z — so the swing can never twist the arm into the torso.
     for (const [arm, s2] of [[armL, 1], [armR, -1]]) {
       const drop = new THREE.Group();
-      drop.rotation.z = s2 * 1.02;
+      drop.rotation.z = s2 * 0.9;
       while (arm.children.length) drop.add(arm.children[0]);
       arm.add(drop);
-      arm.position.x += -s2 * 0.025;   // seat the shoulder a touch outboard
+      arm.position.x += s2 * 0.01;     // tuck the deltoid back into the shoulder socket
+      arm.position.y += 0.015;
     }
     g.limbs = { legL, legR, armL, armR };
     g.phase = Math.random() * 6;
@@ -2590,7 +2591,7 @@ const GFX = (() => {
     world.add(put('mug', 0.25, 0.78, -1.35, { fitH: 0.11 }));
     world.add(put('desk_phone', 1.05, 0.78, -1.85, { fitH: 0.13 }));
     world.add(put('square_desklamp', -1.25, 0.78, -2.0, { fitH: 0.36 }));
-    world.add(put('office_chair_black', 1.6, 0, -0.6, { fitH: 0.95, ry: -0.9 }));
+    world.add(put('office_chair_black', 1.6, 0, -0.6, { fitH: 0.95, ry: 2.2 }));
     world.add(put('book_case', -3.4, 0, -2.95, { fitH: 1.9 }));
     world.add(put('file_cabinet_small', 3.6, 0, -3.05, { fitH: 1.0 }));
     world.add(put('cactus_medium_A', 3.6, 1.0, -3.05, { fitH: 0.4 }));
@@ -2791,7 +2792,7 @@ const GFX = (() => {
     miniPulley.position.set(2.45, 1.02, -4.25); world.add(miniPulley);
     const benchSign = textSprite('TEST BENCH', '#46b8e8', 26);
     benchSign.position.set(0, 2.5, -4.25); benchSign.scale.multiplyScalar(0.9); world.add(benchSign);
-    world.add(put('conference_chair_blue', -0.55, 0, -2.85, { fitH: 0.9, ry: Math.PI }));
+    world.add(put('conference_chair_blue', -0.55, 0, -2.85, { fitH: 0.9, ry: 0 }));
     station(0, -3.4, 2.0, '🧪 Test bench — run laboratory evaluations', () => enterHQ('labs'));
     block(-1.2, -4.25, 1.15); block(1.2, -4.25, 1.15);
 
@@ -2801,7 +2802,7 @@ const GFX = (() => {
     world.add(put('computer_keyboard', -5.75, 0.76, -3.4, { fitH: 0.05, ry: Math.PI / 2 }));
     world.add(put('desk_phone', -6.25, 0.76, -2.75, { fitH: 0.14, ry: Math.PI / 2 }));
     world.add(put('lamp_architect', -6.3, 0.76, -4.0, { fitH: 0.45, ry: 2.4 }));
-    world.add(put('office_chair_black', -5.2, 0, -3.4, { fitH: 0.92, ry: -Math.PI / 2 }));
+    world.add(put('office_chair_black', -5.2, 0, -3.4, { fitH: 0.92, ry: Math.PI / 2 }));
     const unread = visibleMemos().filter(m => !SV.read.includes(m.id)).length;
     if (unread) {
       const mark = textSprite(unread + ' NEW', '#f08c3a', 26);
@@ -2827,7 +2828,7 @@ const GFX = (() => {
     world.add(wsCart);
     const wsSign = textSprite('WORKSHOP', '#f08c3a', 26);
     wsSign.position.set(6.1, 2.3, -2.1); wsSign.scale.multiplyScalar(0.85); world.add(wsSign);
-    world.add(put('office_chair_black', 5.1, 0, -2.1, { fitH: 0.92, ry: Math.PI / 2 }));
+    world.add(put('office_chair_black', 5.1, 0, -2.1, { fitH: 0.92, ry: -Math.PI / 2 }));
     station(5.1, -2.1, 1.6, '🔧 Workshop — sensors, shells & upgrades', () => enterHQ('shop'));
     block(6.0, -2.1, 1.0);
 
@@ -2835,20 +2836,17 @@ const GFX = (() => {
     world.add(put('book_case', 3.6, 0, -4.68, { fitH: 1.85 }));
     world.add(put('file_cabinet_small', 4.55, 0, -4.68, { fitH: 1.0 }));
     world.add(put('file_cabinet_small', 5.1, 0, -4.68, { fitH: 1.0 }));
-    world.add(put('file_cabinet_large_shelf', 4.85, 1.45, -4.82, { fitH: 0.3 }));
-    world.add(put('file_binder', 4.5, 1.52, -4.74, { fitH: 0.26 }));
-    world.add(put('file_binder', 4.62, 1.52, -4.74, { fitH: 0.26 }));
     world.add(put('file_binder', 5.55, 0, -4.6, { fitH: 0.26, ry: 1.2 }));
     const eqSign = textSprite('EQUIPMENT', '#8d99a6', 22);
     eqSign.position.set(4.5, 2.35, -4.6); eqSign.scale.multiplyScalar(0.75); world.add(eqSign);
-    // reference spring + mass set live on the wall shelf
+    // reference spring + mass set live on the cabinet tops
     const shelfSpring = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.5, 10).rotateZ(Math.PI / 2),
       new THREE.MeshLambertMaterial({ color: 0xf08c3a }));
-    shelfSpring.position.set(5.05, 1.56, -4.78); shelfSpring.castShadow = true; world.add(shelfSpring);
+    shelfSpring.position.set(5.05, 1.06, -4.66); shelfSpring.castShadow = true; world.add(shelfSpring);
     for (let mi = 0; mi < 3; mi++) {
       const mass = new THREE.Mesh(new THREE.CylinderGeometry(0.05 + mi * 0.015, 0.05 + mi * 0.015, 0.09, 12),
         new THREE.MeshLambertMaterial({ color: 0x4a5560 }));
-      mass.position.set(4.35 + mi * 0.15, 1.05, -4.7); mass.castShadow = true; world.add(mass);
+      mass.position.set(4.42 + mi * 0.13, 1.05, -4.68); mass.castShadow = true; world.add(mass);
     }
     // sensor crates appear as you buy them
     const sensorMeshes = {
@@ -2860,7 +2858,7 @@ const GFX = (() => {
     for (const s of SENSORS) {
       if (!SV.sensors[s.id]) continue;
       const m2 = sensorMeshes[s.id]();
-      m2.position.set(4.95 + si * 0.2, 1.08, -4.7); m2.castShadow = true;
+      m2.position.set(4.95 + si * 0.16, 1.08, -4.68); m2.castShadow = true;
       world.add(m2); si++;
     }
     station(4.4, -3.8, 1.3, '🧰 Equipment shelf', () => {
@@ -2868,29 +2866,6 @@ const GFX = (() => {
       toast(owned.length ? `In stock: ${owned.join(', ')} — installed on the SC-01` : 'Bare shelves. Sensors are bought at the Workshop.', 'story');
     });
     block(4.4, -4.6, 1.1);
-
-    // ── whiteboard: someone worked here before you ──
-    const wbCnv = document.createElement('canvas'); wbCnv.width = 512; wbCnv.height = 288;
-    const wc2 = wbCnv.getContext('2d');
-    wc2.fillStyle = '#eef1ee'; wc2.fillRect(0, 0, 512, 288);
-    wc2.strokeStyle = '#b9beb9'; wc2.lineWidth = 8; wc2.strokeRect(4, 4, 504, 280);
-    wc2.fillStyle = '#2b4a8a'; wc2.font = 'italic 26px Georgia, serif';
-    wc2.fillText('x = ½at²        T = 2π√(m/k)', 30, 56);
-    wc2.fillText('J = Δp           Fᵦ = ρVg  ←  tank!!', 30, 100);
-    wc2.fillStyle = '#a83232'; wc2.font = 'bold 22px Georgia, serif';
-    wc2.fillText('DAYS SINCE INCIDENT 4:', 30, 160);
-    wc2.fillText('0', 300, 160);
-    wc2.beginPath(); wc2.moveTo(292, 168); wc2.lineTo(322, 140); wc2.strokeStyle = '#a83232'; wc2.lineWidth = 2; wc2.stroke();
-    wc2.fillStyle = '#4a4a4a'; wc2.font = '18px Georgia, serif';
-    wc2.fillText('2:14 AM again. who keeps booking the bench??', 30, 200);
-    wc2.strokeStyle = '#2b7a4a'; wc2.lineWidth = 4;
-    wc2.strokeRect(360, 210, 110, 44);
-    wc2.beginPath(); wc2.arc(385, 262, 12, 0, 7); wc2.arc(445, 262, 12, 0, 7); wc2.stroke();
-    wc2.fillStyle = '#2b7a4a'; wc2.font = '20px Georgia, serif'; wc2.fillText('it waved??', 232, 240);
-    const wbTex = new THREE.CanvasTexture(wbCnv); wbTex.encoding = THREE.sRGBEncoding;
-    const wb = new THREE.Mesh(new THREE.PlaneGeometry(1.75, 0.98), new THREE.MeshLambertMaterial({ map: wbTex }));
-    wb.position.set(1.95, 1.62, -4.97);
-    world.add(wb);
 
     // ── Engineer #7's old desk — taped off, untouched ──
     world.add(put('desk2', -3.7, 0, 4.05, { fitH: 0.76, ry: Math.PI }));
@@ -2943,7 +2918,7 @@ const GFX = (() => {
     // ── the shift piles up: coffee & takeout appear as labs get certified ──
     const CLUTTER = [
       ['cup', -5.6, 0.76, -3.0], ['noodles', 1.7, 0.875, -4.1], ['cup', 0.6, 0.875, -4.45],
-      ['pizza', -2.2, 0, 2.2], ['soda', 5.6, 0.78, -2.6], ['cup', -6.2, 0.76, 2.3],
+      ['pizza', -2.2, 0, 2.2], ['soda', 5.6, 0.78, -2.6], ['cup', -6.3, 0, 2.55],
       ['noodles', 5.7, 0.78, -1.2], ['paper', 1.2, 0, 1.6], ['soda', -3.4, 0.76, 4.25],
       ['pizza', 3.1, 0, 3.2], ['cup', 2.3, 0.875, -3.9], ['paper', -1.6, 0, 0.6],
       ['soda', 0.2, 0.875, -4.0], ['noodles', -5.5, 0, 2.45], ['cup', 4.35, 1.0, -4.6],
@@ -3015,16 +2990,7 @@ const GFX = (() => {
       toast('The tank is at operating depth. Do NOT certify the oil as a beverage (Incident 4).', 'story'));
     block(-5.9, -0.3, 0.9);
 
-    // ── RECORDS DESK (west-south): transcript ──
-    world.add(put('desk1_corner', -6.1, 0, 2.9, { fitH: 0.76, ry: Math.PI / 2 }));
-    world.add(put('printer_desktop', -6.35, 0.76, 3.75, { fitH: 0.32, ry: Math.PI / 2 }));
-    const prTag = textSprite('TRANSCRIPT PRINTER', '#8d99a6', 18);
-    prTag.position.set(-6.3, 1.5, 3.75); prTag.scale.multiplyScalar(0.5); world.add(prTag);
-    world.add(put('paper_stack', -6.2, 0.76, 2.6, { fitH: 0.12 }));
-    world.add(put('pictureframe_standing_A', -6.2, 0.76, 3.3, { fitH: 0.3, ry: Math.PI / 2 }));
-    world.add(put('book_set', -6.2, 0.76, 2.0, { fitH: 0.2, ry: Math.PI / 2 }));
-    station(-5.3, 2.9, 1.5, '📜 Records — your certification transcript', () => { hqTab = 'inbox'; showTranscript(); });
-    block(-6.1, 2.9, 0.9);
+    // records live in the terminal (CertViewer); the cot corner stays clear
 
     // ── coffee corner (south-east) ──
     world.add(put('file_cabinet_small', 6.35, 0, 3.9, { fitH: 1.0, ry: -Math.PI / 2 }));
