@@ -28,6 +28,9 @@ Smart-Cart/
 ├── game/
 │   ├── README.md                       Game guide, assets, content pipeline
 │   └── index.html                      Cart Blanche — physics adventure game
+├── labsim/
+│   ├── README.md                       Lab design, grading, assets
+│   └── index.html                      The Physics Company — AP lab career
 └── docs/
     ├── WIRING.md                       Pinout and sensor connections
     ├── CALIBRATION.md                  Every tunable constant, and how to set it
@@ -52,6 +55,16 @@ game where the Smart Cart fights the Stationary Front across four worlds of
 missions, kinetic-energy combat, and question gates — with XP levels, a shop,
 and everything running on the same honest F = ma physics. Open it in any
 browser; see [`game/README.md`](game/README.md).
+
+## Lab career game
+
+[`labsim/index.html`](labsim/index.html) is **The Physics Company**, an
+AP® Physics 1 lab-career game: hired to certify the SC-01, students run six
+real experiments (kinematics through rotation), read their own recorded
+telemetry, and type numeric answers with units — checked against their run
+within ±4%. Sensors are purchasable upgrades that unlock telemetry, labs pay
+per verified answer, and a printable certification transcript records it all.
+See [`labsim/README.md`](labsim/README.md).
 
 ## Hardware
 
