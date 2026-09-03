@@ -334,6 +334,8 @@
   .toast.pay{border-color:#5a4a1c; color:var(--pay)}
   .toast.good{color:var(--ok)} .toast.bad{color:var(--bad)}
   .toast.story{border-color:#4a3a5e; color:var(--purple)}
+  .bodyrow{display:flex;align-items:center;gap:8px;margin:2px 0 10px;font-size:13px;color:var(--muted)}
+  .bodyopt.on{border-color:var(--co);color:var(--co);background:rgba(70,184,232,.1)}
   #devpanel{position:fixed;top:44px;left:10px;z-index:60;background:#101720ee;border:1px solid #ffb545;border-radius:8px;padding:8px 10px;font:12px ui-monospace,monospace;color:#e7edf3;max-width:270px}
   #devpanel .dp-head{color:#ffb545;margin-bottom:2px;letter-spacing:.5px}
   #devpanel .dp-head span{opacity:.55;font-size:10px}
@@ -356,6 +358,9 @@
     <p id="hire-copy">Congratulations! You have been selected to certify the <b>SC-01 Smart Cart</b>
       through seven laboratory evaluations. Compensation per verified result. Company property must not be named.
       Please sign below.</p>
+    <div class="bodyrow"><span>Report for duty as</span>
+      <button class="btn small bodyopt on" data-body="f">Female</button>
+      <button class="btn small bodyopt" data-body="m">Male</button></div>
     <input id="hire-name" maxlength="24" placeholder="Print name (for your certification transcript)">
     <button class="btn primary" id="btn-hire">Sign &amp; report to duty</button>
     <button class="btn" id="btn-continue" hidden>Continue as <span id="cont-name"></span></button>
@@ -590,7 +595,7 @@ function freshSave() {
     name: '', money: 0, sensors: { encoder: false, imu: false, loadcell: false },
     shell: 'white', led: 'green', extras: {}, office: {},
     labs: {},                    // labId -> {done, scorePct, pay, q: [{attempts,tier,done,hint}]}
-    read: [], replies: {}, flags: {}, sound: true, hired: '', day: 1,
+    read: [], replies: {}, flags: {}, sound: true, hired: '', day: 1, body: 'f',
   };
 }
 let SV = freshSave();
@@ -1360,8 +1365,8 @@ const LABS = [
       if (sim.time > 3) sim.doneEarly = true;
     } else {
       const rho = { water: p.rhoW, brine: p.rhoB, oil: p.rhoO }[sim.ctl.fluid];
-      sim.v = 0.02;                                    // winch speed
-      sim.depth = Math.max(0, sim.time * 0.02 - 0.04); // depth of cylinder BOTTOM below surface
+      sim.v = 0.04;                                    // winch speed
+      sim.depth = Math.max(0, sim.time * 0.04 - 0.04); // depth of cylinder BOTTOM below surface
       const frac = clamp(sim.depth / SAMPLE_H, 0, 1);
       sim.F = p.ms * G - rho * SAMPLE_V * frac * G;
       sim.x = sim.depth; sim.a = 0;
@@ -2441,11 +2446,14 @@ const GFX = (() => {
      sorted into an upper and a lower half at the hinge plane, the lower half is
      re-origined at the hinge, and a small sphere fills the joint so the two
      halves never visibly separate while bending */
+  /* ball = [cx, cy, cz, rx, ry, rz]: an ellipsoid matched to the limb's own
+     cross-section at the hinge, so it stays inside the straight limb and only
+     shows as a rounded joint where a bend opens the seam */
   const HJOINT = {
-    legL: { axis: 1, at: -0.37, dir: 1, piv: [0, -0.37, 0], ball: [-0.04, 0, 0.01, 0.058] },
-    legR: { axis: 1, at: -0.37, dir: 1, piv: [0, -0.37, 0], ball: [0.04, 0, 0.01, 0.058] },
-    armL: { axis: 0, at: -0.27, dir: 1, piv: [-0.27, -0.19, 0], ball: [0, 0, -0.015, 0.05] },
-    armR: { axis: 0, at: 0.27, dir: -1, piv: [0.27, -0.19, 0], ball: [0, 0, -0.015, 0.05] },
+    legL: { axis: 1, at: -0.37, dir: 1, piv: [0, -0.37, 0], ball: [-0.044, 0, 0.008, 0.046, 0.045, 0.052] },
+    legR: { axis: 1, at: -0.37, dir: 1, piv: [0, -0.37, 0], ball: [0.044, 0, 0.008, 0.046, 0.045, 0.052] },
+    armL: { axis: 0, at: -0.27, dir: 1, piv: [-0.27, -0.19, 0], ball: [0, -0.006, -0.014, 0.04, 0.046, 0.038] },
+    armR: { axis: 0, at: 0.27, dir: -1, piv: [0.27, -0.19, 0], ball: [0, -0.006, -0.014, 0.04, 0.046, 0.038] },
   };
   const limbCache = {};
   function limbHalves(name) {
@@ -2472,8 +2480,10 @@ const GFX = (() => {
     loG.translate(-j.piv[0], -j.piv[1], -j.piv[2]);
     return limbCache[name] = [upG, loG];
   }
-  function makePerson(shirt = 0x46b8e8, pants = 0x2b3340, skin = 0xd9a37e, hair = 0x333a41) {
+  function makePerson(shirt = 0x46b8e8, pants = 0x2b3340, skin = 0xd9a37e, hair = 0x333a41, body = 'm') {
     const g = new THREE.Group();
+    const fem = body === 'f';
+    const sw = fem ? 0.92 : 1.0;                   // shoulder width
     const part = (name, tint) => {
       const wrap = new THREE.Group();
       const m = new THREE.Mesh(geomOf('h_' + name), matOf('human', tint));
@@ -2494,15 +2504,17 @@ const GFX = (() => {
       const hinge = new THREE.Group();
       hinge.position.set(j.piv[0], j.piv[1], j.piv[2]);
       const lo = new THREE.Mesh(loG, matOf('human', tint)); lo.castShadow = true;
-      const ball = new THREE.Mesh(new THREE.SphereGeometry(j.ball[3], 10, 8), matOf('human', tint));
-      ball.position.set(j.ball[0], j.ball[1], j.ball[2]); ball.castShadow = true;
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 9), matOf('human', tint));
+      ball.position.set(j.ball[0], j.ball[1], j.ball[2]);
+      ball.scale.set(j.ball[3], j.ball[4], j.ball[5]); ball.castShadow = true;
       hinge.add(lo, ball);
       w.add(up, hinge);
       w.hinge = hinge;
       g.add(w);
       return w;
     };
-    part('torso', shirt);
+    const torso = part('torso', shirt);
+    torso.scale.set(sw, 1, fem ? 0.96 : 1);
     const head = part('head', skin);
     // smooth-shaded dome hugging the skull (the old box cap read as pixels)
     const hairM = new THREE.MeshLambertMaterial({ color: hair });
@@ -2511,12 +2523,26 @@ const GFX = (() => {
     cap.position.set(0, 0.185, 0.01);
     cap.castShadow = true;
     head.add(cap);
-    // rounded mass at the back of the head so the profile isn't a bare bowl
-    const bun = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 10), hairM);
-    bun.scale.set(1.1, 0.85, 0.8);
-    bun.position.set(0, 0.16, -0.075);
-    bun.castShadow = true;
-    head.add(bun);
+    if (fem) {
+      // longer hair: a fuller mass down the back of the head and a low ponytail
+      const back = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 10), hairM);
+      back.scale.set(1.15, 1.35, 0.85);
+      back.position.set(0, 0.11, -0.07);
+      back.castShadow = true;
+      head.add(back);
+      const tail = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 8), hairM);
+      tail.scale.set(0.9, 2.2, 0.9);
+      tail.position.set(0, -0.02, -0.11);
+      tail.castShadow = true;
+      head.add(tail);
+    } else {
+      // rounded mass at the back of the head so the profile isn't a bare bowl
+      const bun = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 10), hairM);
+      bun.scale.set(1.1, 0.85, 0.8);
+      bun.position.set(0, 0.16, -0.075);
+      bun.castShadow = true;
+      head.add(bun);
+    }
     const legL = jointed('legL', pants), legR = jointed('legR', pants);
     const armL = jointed('armL', shirt), armR = jointed('armR', shirt);
     legL.knee = legL.hinge; legR.knee = legR.hinge;
@@ -2528,11 +2554,12 @@ const GFX = (() => {
       drop.rotation.z = s2 * 0.9;
       while (arm.children.length) drop.add(arm.children[0]);
       arm.add(drop);
-      arm.position.x += s2 * 0.01;     // tuck the deltoid back into the shoulder socket
+      arm.position.x = arm.position.x * sw + s2 * 0.01;   // socket follows the shoulder width
       arm.position.y += 0.015;
       arm.elbow = arm.hinge;           // keep the hinge handle after re-parenting
-      arm.elbow.rotation.y = s2 * 0.22;   // natural resting bend
+      arm.elbow.rotation.y = 0;
     }
+    if (fem) g.scale.setScalar(0.965);
     g.limbs = { legL, legR, armL, armR };
     g.phase = Math.random() * 6;
     return g;
@@ -2550,15 +2577,14 @@ const GFX = (() => {
       const kb = 0.8 * Math.min(1, k / 1.1);
       L.legL.knee.rotation.x = kb * Math.max(0.05, -Math.cos(p.phase));
       L.legR.knee.rotation.x = kb * Math.max(0.05, Math.cos(p.phase));
-      L.armL.elbow.rotation.y = 0.25 + 0.3 * Math.max(0, Math.sin(p.phase));
-      L.armR.elbow.rotation.y = -0.25 - 0.3 * Math.max(0, -Math.sin(p.phase));
+      L.armL.elbow.rotation.y = 0.12 + 0.3 * Math.max(0, Math.sin(p.phase));
+      L.armR.elbow.rotation.y = -0.12 - 0.3 * Math.max(0, -Math.sin(p.phase));
       if (p.baseY !== undefined) p.position.y = p.baseY + Math.abs(Math.sin(p.phase)) * 0.045;
     } else {
       const f = Math.pow(0.001, dt);
       for (const k2 of ['legL', 'legR', 'armL', 'armR']) L[k2].rotation.x *= f;
       L.legL.knee.rotation.x *= f; L.legR.knee.rotation.x *= f;
-      L.armL.elbow.rotation.y = 0.22 + (L.armL.elbow.rotation.y - 0.22) * f;
-      L.armR.elbow.rotation.y = -0.22 + (L.armR.elbow.rotation.y + 0.22) * f;
+      L.armL.elbow.rotation.y *= f; L.armR.elbow.rotation.y *= f;
       if (p.baseY !== undefined) p.position.y += (p.baseY - p.position.y) * Math.min(1, dt * 10);
     }
   }
@@ -2631,7 +2657,7 @@ const GFX = (() => {
       world.add(c); CITY.cars.push(c);
     }
     for (let k = 0; k < 5; k++) {
-      const p = makePerson(SHIRTS[k % SHIRTS.length], undefined, SKINS[k % SKINS.length]);
+      const p = makePerson(SHIRTS[k % SHIRTS.length], undefined, SKINS[k % SKINS.length], [0x1a1d22, 0x4a3324, 0x6b5a48, 0x2b2b2e][k % 4], k % 2 ? 'f' : 'm');
       const dir = k % 2 ? 1 : -1;
       p.baseY = WALK_Y;
       p.position.set(-40 + k * 17, WALK_Y, k % 2 ? 5.6 : -5.2);
@@ -2670,7 +2696,7 @@ const GFX = (() => {
     CUT.car.position.set(-46, ROAD_Y, -1.5);
     CUT.car.rotation.y = Math.PI / 2;
     world.add(CUT.car);
-    CUT.hero = makePerson(0x46b8e8);
+    CUT.hero = makePerson(0x46b8e8, undefined, undefined, 0x111418, SV.body);
     CUT.hero.baseY = WALK_Y;
     CUT.hero.visible = false;
     world.add(CUT.hero);
@@ -2744,11 +2770,11 @@ const GFX = (() => {
     crest.position.set(0.4, 2.6, -3.4); crest.scale.multiplyScalar(0.95); world.add(crest);
     const plaque = textSprite('R. FULCRUM — FOUNDER', '#ffd24a', 18);
     plaque.position.set(0.4, 1.05, -0.72); plaque.scale.multiplyScalar(0.42); world.add(plaque);
-    const boss = makePerson(0x3a4149, 0x22272c, 0xb97f5c, 0xcfd6dc);   // grey-haired, dark suit
+    const boss = makePerson(0x3a4149, 0x22272c, 0xb97f5c, 0xcfd6dc, 'm');   // grey-haired, dark suit
     boss.position.set(-0.1, 0, -2.5); boss.baseY = 0;
     world.add(boss);
     CUT.boss = boss;
-    const you = makePerson(0x46b8e8);
+    const you = makePerson(0x46b8e8, undefined, undefined, 0x111418, SV.body);
     you.position.set(-0.9, 0, 1.3); you.rotation.y = Math.PI + 0.4; you.baseY = 0;
     world.add(you);
     camPos.set(3.2, 2.3, 3.9);
@@ -3111,7 +3137,7 @@ const GFX = (() => {
     }
 
     // Marla, extremely fast, out on the sidewalk
-    HUB.marla = makePerson(0xf08c3a, 0x2b3340, 0xe8b98f);
+    HUB.marla = makePerson(0xf08c3a, 0x2b3340, 0xe8b98f, 0x3a2418, 'f');
     HUB.marla.baseY = -0.62;
     HUB.marla.position.set(-20, -0.62, -8.4);
     HUB.marla.rotation.y = Math.PI / 2;
@@ -3168,7 +3194,7 @@ const GFX = (() => {
       ci++;
     }
     // you
-    HUB.player = makePerson(0x46b8e8);
+    HUB.player = makePerson(0x46b8e8, undefined, undefined, 0x111418, SV.body);
     HUB.player.baseY = 0;
     if (keep) { HUB.player.position.set(keep.x, 0, keep.z); HUB.player.rotation.y = keep.ry; }
     else if (spawn === 'bench') { HUB.player.position.set(0, 0, -2.0); HUB.player.rotation.y = Math.PI; }
@@ -3243,7 +3269,7 @@ const GFX = (() => {
     buildHub('night', true);
     camMode = 'sleep';
     if (HUB.player) HUB.player.visible = false;
-    const sleeper = makePerson(0x46b8e8);
+    const sleeper = makePerson(0x46b8e8, undefined, undefined, 0x111418, SV.body);
     sleeper.rotation.x = Math.PI / 2;          // lying on the cot, head north
     sleeper.position.set(-6.1, 0.48, 2.25);
     world.add(sleeper);
@@ -3387,10 +3413,14 @@ const GFX = (() => {
     const lamp = new THREE.PointLight(0xfff0dc, 0.4, 34);
     lamp.position.set(L / 2, 3.6, 2.5);
     world.add(lamp);
-    // company sign — a lit plate bolted to the wall, not floating text
-    box(6.9, 1.05, 0.07, lam(0x0f151c), L / 2, floorY + 2.15, -3.57);
-    box(7.1, 0.06, 0.1, lam(0x46b8e8, { emissive: 0x1c4a63 }), L / 2, floorY + 2.72, -3.57).castShadow = false;
-    box(7.1, 0.06, 0.1, lam(0x46b8e8, { emissive: 0x1c4a63 }), L / 2, floorY + 1.58, -3.57).castShadow = false;
+    // company sign — a framed plate standing off the wall on four pegs
+    const signY = floorY + 2.15, signZ = -3.46;                  // wall face is at z = -3.6
+    for (const px of [-3.1, 3.1]) for (const py of [-0.42, 0.42])
+      box(0.06, 0.06, 0.16, lam(0x6b7784), L / 2 + px, signY + py, -3.54).castShadow = false;
+    box(7.0, 1.15, 0.1, lam(0x2c3540), L / 2, signY, signZ);           // metal frame
+    box(6.8, 0.95, 0.12, lam(0x0f151c), L / 2, signY, signZ);          // dark face
+    box(6.8, 0.05, 0.13, lam(0x46b8e8, { emissive: 0x1c4a63 }), L / 2, signY + 0.44, signZ).castShadow = false;
+    box(6.8, 0.05, 0.13, lam(0x46b8e8, { emissive: 0x1c4a63 }), L / 2, signY - 0.44, signZ).castShadow = false;
     const signCv = document.createElement('canvas');
     signCv.width = 1024; signCv.height = 128;
     const sctx = signCv.getContext('2d');
@@ -3402,7 +3432,7 @@ const GFX = (() => {
     signTx.minFilter = THREE.LinearFilter;
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(6.6, 0.825),
       new THREE.MeshBasicMaterial({ map: signTx, transparent: true }));
-    sign.position.set(L / 2, floorY + 2.15, -3.53);
+    sign.position.set(L / 2, signY, signZ + 0.065);
     world.add(sign);
     // the bench: one long brushed-steel desk carrying the whole track
     const benchMat = new THREE.MeshLambertMaterial({ map: tileTex('steel', 6, 1), color: 0x8f9dab });
@@ -3500,7 +3530,22 @@ const GFX = (() => {
   /* (re)build the track for current mode/controls — cheap enough to redo.
      Unplaced setup parts render as pulsing ghost slots; placed parts render real. */
   let slotMeshes = {}, ghostMats = [], placedMeshes = {};
-  let tankSample = null, massMesh = null, stringLine = null;
+  let tankSample = null, massMesh = null, stringLine = null, winchDrum = null;
+  /* a coil spring along x, centred on the origin, `len` long at scale 1 — stretch
+     or squash it with scale.x and the coils follow */
+  class HelixCurve extends THREE.Curve {
+    constructor(len, r, turns) { super(); this.len = len; this.r = r; this.turns = turns; }
+    getPoint(t, o = new THREE.Vector3()) {
+      const a = t * this.turns * Math.PI * 2;
+      return o.set((t - 0.5) * this.len, Math.cos(a) * this.r, Math.sin(a) * this.r);
+    }
+  }
+  function coilSpring(len, r, turns, color) {
+    const geo = new THREE.TubeGeometry(new HelixCurve(len, r, turns), Math.round(turns * 18), 0.011, 6, false);
+    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color }));
+    m.castShadow = true;
+    return m;
+  }
   /* register a placed part's meshes so it can be right-clicked back into the tray */
   function reg(part, ...objs) {
     const g = new THREE.Group();
@@ -3547,7 +3592,7 @@ const GFX = (() => {
     const lab = LR.lab, L = lab.track.L;
     springMesh = null; cartBMesh = null;
     slotMeshes = {}; ghostMats = []; placedMeshes = {};
-    tankSample = null; massMesh = null; stringLine = null;
+    tankSample = null; massMesh = null; stringLine = null; winchDrum = null;
     const placed = id => !!LR.placed[id];
     const wants = id => (lab.setup || []).some(pt => pt.id === id && (!pt.modes || pt.modes.includes(LR.mode)));
     if (riserMesh) { world.remove(riserMesh); riserMesh = null; }
@@ -3646,7 +3691,7 @@ const GFX = (() => {
             new THREE.MeshLambertMaterial({ color: fc, transparent: true, opacity: 0.55 }));
           fluid.position.set(2, 0.33, 0);
           const ds = textSprite('THE DEEP END', '#7fd0f5', 26);
-          ds.position.set(2, 1.85, 0); ds.scale.multiplyScalar(0.75);
+          ds.position.set(2, 1.12, 0.62); ds.scale.multiplyScalar(0.6);
           reg('tank', glass, fluid, ds);
         } else addGhost('tank', 2, 0.02, 0, 'Test tank');
       }
@@ -3660,7 +3705,9 @@ const GFX = (() => {
           const cell = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.12),
             new THREE.MeshLambertMaterial({ color: 0xf08c3a }));
           cell.position.set(2, 1.58, 0);
-          reg('boom', post, arm, cell);
+          winchDrum = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.14, 14).rotateX(Math.PI / 2), lam(0x39424c));
+          winchDrum.position.set(2.7, 1.65, 0); winchDrum.castShadow = true;
+          reg('boom', post, arm, cell, winchDrum);
         } else addGhost('boom', 2.95, 0.02, 0, 'Load-cell boom');
       }
       if (wants('sample')) {
@@ -3668,9 +3715,9 @@ const GFX = (() => {
           tankSample = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.4, 16),
             new THREE.MeshLambertMaterial({ color: 0x6a7580 }));
           tankSample.castShadow = true;
-          tankSample.position.set(2, 1.25, 0);
+          tankSample.position.set(2, 1.1, 0);
           const lg = new THREE.BufferGeometry();
-          lg.setAttribute('position', new THREE.Float32BufferAttribute([2, 1.52, 0, 2, 1.45, 0], 3));
+          lg.setAttribute('position', new THREE.Float32BufferAttribute([2, 1.52, 0, 2, 1.3, 0], 3));
           stringLine = new THREE.Line(lg, new THREE.LineBasicMaterial({ color: 0xdfe4ea }));
           reg('sample', tankSample, stringLine);
         } else if (!placed('sample')) addGhost('sample', 2, placed('tank') ? 1.08 : 0.02, 0, 'Test cylinder');
@@ -3713,8 +3760,7 @@ const GFX = (() => {
     if (lab.id === 'l4') {
       if (LR.mode === 'bumper') {
         if (placed('bumper')) {
-          springMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.35, 10).rotateZ(Math.PI / 2),
-            new THREE.MeshLambertMaterial({ color: 0xf08c3a }));
+          springMesh = coilSpring(0.35, 0.05, 6, 0xf08c3a);
           springMesh.position.set(7.9, 0.12, 0);
           const bClamp = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.55, 0.6), lam(0x39434c));
           bClamp.position.set(8.35, 0.27, 0); bClamp.castShadow = true;
@@ -3735,8 +3781,7 @@ const GFX = (() => {
     }
     if (lab.id === 'l5') {
       if (placed('spring')) {
-        springMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1, 10).rotateZ(Math.PI / 2),
-          new THREE.MeshLambertMaterial({ color: 0xf08c3a }));
+        springMesh = coilSpring(1, 0.05, 14, 0xf08c3a);
         springMesh.position.set(0.5, 0.12, 0);
         const aClamp = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.55, 0.6), lam(0x39434c));
         aClamp.position.set(-0.55, 0.27, 0); aClamp.castShadow = true;
@@ -3789,9 +3834,16 @@ const GFX = (() => {
       cartMesh.position.set(3.6, 0.9, 0);
       cartMesh.rotation.z = 0;
       if (tankSample) {
-        const depth = sim && sim.mode === 'dunk' ? Math.max(0, sim.time * 0.02 - 0.04) : 0;
-        const y = 1.25 - clamp(depth * 4.6, 0, 0.78);
+        // the winch pays out cable from t = 0: the cylinder drops through the air
+        // gap, breaks the surface and keeps going until fully under (scene units
+        // are 3.33x the sim's metres, so 0.12 m of cylinder is 0.4 tall here)
+        const paid = sim && sim.mode === 'dunk' ? sim.time * 0.04 * 3.33 : 0;
+        const y = 1.1 - clamp(paid, 0, 0.66);
         tankSample.position.y = y;
+        // in the weigh pass the cylinder settles on the hook with a small damped swing
+        const t2 = sim ? sim.time : 0;
+        tankSample.rotation.z = sim && sim.mode === 'weigh' ? 0.12 * Math.sin(t2 * 5) * Math.exp(-t2 * 1.1) : 0;
+        if (winchDrum) winchDrum.rotation.z = -paid * 14;
         if (stringLine) {
           const pos = stringLine.geometry.attributes.position.array;
           pos[0] = 2; pos[1] = 1.52; pos[2] = 0;
@@ -3802,8 +3854,8 @@ const GFX = (() => {
     } else if (LR.lab.track.type === 'hill') {
       cartMesh.position.set(x, (sim ? sim.y : LR.ctl.h || 1.4), 0);
       const th = Math.PI / 6;
-      cartMesh.rotation.z = (sim && sim.x < -0.05) ? th : 0;
-      if (!sim) { const h = LR.ctl.h || 1.4; cartMesh.position.set(-h / Math.tan(th), h, 0); cartMesh.rotation.z = th; }
+      cartMesh.rotation.z = (sim && sim.x < -0.05) ? -th : 0;
+      if (!sim) { const h = LR.ctl.h || 1.4; cartMesh.position.set(-h / Math.tan(th), h, 0); cartMesh.rotation.z = -th; }
     } else if (LR.lab.track.type === 'incline' && LR.mode === 'tilt') {
       const degNow = sim ? sim.theta : (LR.ctl.angle0 || 0);
       const thNow = degNow * Math.PI / 180;
@@ -4009,6 +4061,7 @@ $('btn-hire').addEventListener('click', () => {
   const nm = $('hire-name').value.trim();
   if (!nm) { toast('HR requires a name. Any name. Even "Doug".', 'bad'); return; }
   SV.name = nm;
+  SV.body = document.querySelector('.bodyopt.on')?.dataset.body || 'f';
   SV.hired = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   persist(); SFX.promo(); SFX.resume();
   GFX.startCutscene(() => {
@@ -4018,6 +4071,10 @@ $('btn-hire').addEventListener('click', () => {
   });
 });
 $('btn-continue').addEventListener('click', () => { SFX.resume(); enterHub(); });
+document.querySelectorAll('.bodyopt').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.bodyopt').forEach(x => x.classList.toggle('on', x === b));
+  SFX.click();
+}));
 $('btn-skip').addEventListener('click', () => GFX.skipCine());
 $('btn-hq-exit').addEventListener('click', () => { SFX.click(); enterHub(); });
 $('os-start').addEventListener('click', () =>
