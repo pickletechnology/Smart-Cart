@@ -56,6 +56,11 @@ const b64 = path => 'data:image/png;base64,' + readFileSync(path).toString('base
 const meshes = {}, tex = {};
 for (const group of readdirSync(join(root, 'assets'))) {
   const dir = join(root, 'assets', group);
+  if (group === 'textures') {           // loose tiling textures, no meshes
+    for (const f of readdirSync(dir).filter(f => f.endsWith('.png')).sort())
+      tex[basename(f, '.png')] = b64(join(dir, f));
+    continue;
+  }
   const hasAtlas = existsSync(join(dir, 'atlas.png'));
   if (hasAtlas) tex[group] = b64(join(dir, 'atlas.png'));
   for (const f of readdirSync(dir).filter(f => f.endsWith('.obj')).sort()) {
